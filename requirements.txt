@@ -1,0 +1,15 @@
+requests
+beautifulsoup4
+pandas
+selenium
+lxml
+easyocr
+pdfplumber
+Pillow
+langchain
+langchain-community
+pytesseract
+matplotlib
+ray
+langchain-upstage
+pymongo
