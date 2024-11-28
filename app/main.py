@@ -1,12 +1,27 @@
 import streamlit as st
 from components.sidebar import add_custom_sidebar
 from PIL import Image
+import sys
+import os
+import importlib.util
 
 # 페이지 기본 설정
 st.set_page_config(layout="wide", initial_sidebar_state="expanded")
 
 add_custom_sidebar()
 
+# def run_musical_process():
+#     try:
+#         # All_Musical_Process.py 경로 설정
+#         script_path = os.path.abspath(os.path.join(os.path.dirname(__file__), "../utils/All_Musical_Process.py"))
+#         # 모듈 로드 및 실행
+#         spec = importlib.util.spec_from_file_location("All_Musical_Process", script_path)
+#         all_musical_module = importlib.util.module_from_spec(spec)
+#         spec.loader.exec_module(all_musical_module)
+#     except Exception as e:
+#         st.error(f"실행 중 오류 발생: {e}")
+
+# run_musical_process()
 st.markdown("""
 <style>
 /* 기본 스타일 */
