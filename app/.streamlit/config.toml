@@ -1,9 +1,0 @@
-[theme]
-primaryColor = "#1f77b4"         # 기본 버튼 및 강조 색상
-backgroundColor = "#f0f2f6"      # 앱 배경 색상
-secondaryBackgroundColor = "#ffffff"  # 사이드바 및 다른 배경 색상
-textColor = "#000000"            # 텍스트 색상
-font = "sans serif"              # 기본 글꼴 (sans serif, serif, monospace 등)
-
-[server]
-headless = true                   # 서버 설정
