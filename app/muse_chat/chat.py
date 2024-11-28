@@ -1,8 +1,8 @@
 from typing import Dict
 
 from langgraph.graph import END, START, StateGraph
-from nodes.core import HyDENode
-from nodes.state import GraphState
+from chat_modules.core import HyDENode
+from chat_modules.state import GraphState
 
 
 class VadaRAG:

@@ -1,5 +1,5 @@
 from abc import ABC, abstractmethod
-from nodes.state import GraphState
+from chat_modules.state import GraphState
 
 
 class BaseNode(ABC):
