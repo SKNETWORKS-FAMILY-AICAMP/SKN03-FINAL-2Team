@@ -60,28 +60,11 @@ st.markdown("""
 def run_musical_process():
     try:
         # All_Musical_Process.py 경로 설정
-        script_path = os.path.abspath(
-            os.path.join(os.path.dirname(__file__), "../utils/All_Musical_Process.py")
-        )
-        
-        # 파일 존재 여부 확인
-        if not os.path.exists(script_path):
-            raise FileNotFoundError(f"`All_Musical_Process.py` 파일을 찾을 수 없습니다: {script_path}")
-
-        # 모듈 로드 및 특정 함수 호출
+        script_path = os.path.abspath(os.path.join(os.path.dirname(__file__), "../utils/All_Musical_Process.py"))
+        # 모듈 로드 및 실행
         spec = importlib.util.spec_from_file_location("All_Musical_Process", script_path)
         all_musical_module = importlib.util.module_from_spec(spec)
         spec.loader.exec_module(all_musical_module)
-
-        # 엔트리 포인트 함수 호출 (예: main 함수)
-        if hasattr(all_musical_module, "main"):
-            all_musical_module.main()
-            print("`main` 함수 실행 완료")
-        else:
-            raise AttributeError("`All_Musical_Process.py`에 `main` 함수가 정의되어 있지 않습니다.")
-    except FileNotFoundError as fnf_error:
-        st.error(str(fnf_error))
-        raise
     except Exception as e:
         st.error(f"`All_Musical_Process.py` 실행 중 오류 발생: {e}")
         raise
@@ -247,7 +230,6 @@ if st.button("추천받기", key="run_button"):
                             st.markdown(f"""
                             - **제목**: {row['title']}
                             - **장소**: {row['place']}
-                            - **기간**: {row['start_date']} ~ {row['end_date']}
                             - **출연진**: {row['cast']}
                             - **장르**: {row['genre']}
                             - **티켓 가격**: {row['ticket_price']}

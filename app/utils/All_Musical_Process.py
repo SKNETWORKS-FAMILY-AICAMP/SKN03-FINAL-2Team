@@ -27,30 +27,35 @@ class Musical_Process:
             print(f"Error occurred while executing {script_name}: {e}")
             raise
 
-def main():
+if __name__ == "__main__":
+    processed_data_file_path = f'{config.file_path}/{config.processed_data}'
     add_genre_file_path = f'{config.file_path}/{config.add_genre_file_name}'
 
     process = Musical_Process() 
 
-    # 장르 추가 실행 조건
+    """처음 전처리 코드 per+raw.json -> processed_data.json"""
+    if not os.path.exists(processed_data_file_path):
+        process.execute_script("first_preprocessing.py")
+    else:
+        print('pass first_preprocessing')
+     
+    """장르 추가 실행 조건 processed_data.json -> add_genre_story.json"""
     if not os.path.exists(add_genre_file_path):
         process.execute_script("prompt.py")
     else:
         print('pass prompt')
+        pass
 
-    # 전처리 코드 실행 조건
+    """전처리 코드 실행 조건 add_genre_story.json -> df_with_negatives.json"""
     if not os.path.exists(config.df_with_negatives_path):
         process.execute_script("preprocessing.py")
     else:
         print('pass Preprocessing')
-
-    # 모델 생성 실행 조건
+            
+    """모델 생성 실행 조건"""
     if not os.path.exists(config.save_model_path):
+        # print("DeepFM 실행")
         process.execute_script("DeepFM.py")
     else:
         print('pass model')
-
-
-
-if __name__ == "__main__":
-   main()
+        pass

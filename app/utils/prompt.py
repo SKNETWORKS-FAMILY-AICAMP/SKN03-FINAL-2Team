@@ -2,9 +2,9 @@ import pandas as pd
 import os
 import openai
 from langchain_core.prompts import ChatPromptTemplate
-# from langchain.callbacks import get_openai_callback
 from langchain_community.callbacks.manager import get_openai_callback
-from langchain_community.llms import OpenAI
+from langchain_openai import OpenAI
+from langchain.chat_models import ChatOpenAI
 import sys
 import os
 sys.path.append(os.path.abspath(os.path.join(os.path.dirname(__file__), '../../')))
@@ -21,11 +21,11 @@ class GenreStoryUpdater:
         출연진: {cast}
         포스터 URL: {poster}
         
-        1. 이 뮤지컬의 장르를 드라마/감동, 코미디/유머, 액션/스릴러, 판타지/어드벤처, 음악중심/주크박스 이 5가지 카테고리 중에 적절한 것을 골라서 적어주세요.
+        1. 이 뮤지컬의 장르를 '역사', '가족', '신화', '지역|창작', '대학로'  이 5가지 카테고리 중에서만 적절한 것을 한 개만 골라서 적어주세요.
         아래와 같은 형식으로 답변해주세요:
         장르: <장르>
         """)
-        self.chat_model = OpenAI(
+        self.chat_model = ChatOpenAI(
             model="gpt-3.5-turbo",
             temperature=0.7,
             max_tokens=300,

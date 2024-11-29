@@ -51,7 +51,7 @@ class Recommender:
         genre_encoded = self.label_encoders['genre'][genre]
         
         # 데이터셋 전체를 사용하여 예측
-        X = self.data[['title', 'cast', 'genre']].copy()
+        X = self.data[['title', 'cast', 'genre', 'percentage']].copy()
         title_encoder = self.label_encoders['title']
         cast_encoder = {v: k for k, v in self.label_encoders['cast'].items()}
         genre_encoder = {v: k for k, v in self.label_encoders['genre'].items()}
@@ -65,7 +65,9 @@ class Recommender:
         
         predictions = self.model.predict([X['title'].values, 
                                           X['cast'].values, 
-                                          X['genre'].values])
+                                          X['genre'].values,
+                                          X['percentage'].values,
+                                          ])
         X['predicted_score'] = predictions
 
         # 입력된 장르로 필터링
@@ -85,19 +87,21 @@ class Recommender:
         top_titles['decoded_genre'] = top_titles['genre'].map({v: k for k, v in genre_encoder.items()})
         top_titles['decoded_cast'] = top_titles['cast'].map(cast_encoder)
         
-        # 기준 데이터와 매칭
-        decoded_titles = top_titles['decoded_title'].tolist()
-        matched_recommendations = self.reference_data[self.reference_data['title'].isin(decoded_titles)]
-        
-        if not matched_recommendations.empty:
-            final_recommendations = matched_recommendations.merge(
-                top_titles[['decoded_title', 'predicted_score']],
-                left_on='title',
-                right_on='decoded_title'
-            ).sort_values(by='predicted_score', ascending=False)
-            final_recommendations = final_recommendations.drop_duplicates(subset=['title'])
-            
-        # 10개 미만이면 필터링되지 않은 데이터 중 추가 
+        # [ ] 제거 및 중복 처리
+        top_titles['clean_title'] = top_titles['decoded_title'].str.replace(r'\[.*?\]', '', regex=True).str.strip()
+        top_titles = top_titles.drop_duplicates(subset=['clean_title'])
+
+        matched_recommendations = self.reference_data[self.reference_data['title'].isin(top_titles['clean_title'])]
+        matched_recommendations['clean_title'] = matched_recommendations['title'].str.replace(r'\[.*?\]', '', regex=True).str.strip()
+        matched_recommendations = matched_recommendations.drop_duplicates(subset=['clean_title'])
+
+        # 최종 데이터 결합
+        final_recommendations = matched_recommendations.merge(
+            top_titles[['clean_title', 'predicted_score']],
+            on='clean_title'
+        ).sort_values(by='predicted_score', ascending=False)
+
+        # 10개 미만이면 필터링되지 않은 데이터 중 추가
         if len(final_recommendations) < 10:
             missing_count = 10 - len(final_recommendations)
             # 이미 포함된 데이터 제외
@@ -105,7 +109,7 @@ class Recommender:
             unfiltered_data = self.data[~self.data['title'].isin(excluded_titles)]
             # top_titles와 unfiltered_data 매칭
             matched_data = unfiltered_data.merge(
-            top_titles[['decoded_title', 'predicted_score']],
+                top_titles[['decoded_title', 'predicted_score']],
                 left_on='title',
                 right_on='decoded_title'
             ).drop_duplicates(subset=['title'])
@@ -129,7 +133,13 @@ class Recommender:
 
             # 최종 결합
             final_recommendations = pd.concat([final_recommendations, matched_reference_data]).sort_values(by='predicted_score', ascending=False).head(10)
-        return final_recommendations[['poster','title', 'place', 'start_date', 'end_date', 'cast', 'genre', 'ticket_price']]    
+
+        # 10개만 반환하도록 처리
+        final_recommendations = final_recommendations.head(10)
+
+        # 결과 출력
+        return final_recommendations[['poster', 'title', 'place', 'cast', 'genre', 'ticket_price']]
+
         """콘솔 테스트용 출력 코드"""    
         # return final_recommendations[['title', 'genre', 'cast', 'predicted_score']]            
 
