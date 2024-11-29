@@ -1,10 +1,22 @@
 from chat_modules.base import BaseNode
 from chat_modules.chain import Chain
 from chat_modules.model import Model
-from chat_modules.tool import Tool
 from chat_modules.state import GraphState
 
+from muse_chat.chat_modules.tools import Tool
+from shared.mongo_base import MongoBase
 
+
+# from chat_modules.core import (
+#     Aggregation,
+#     Embedder,
+#     HyDE,
+#     PopularityReranker,
+#     Reranker,
+#     Retriever,
+#     ReWriter,
+#     SimilarityReranker,
+# )
 class HyDENode(BaseNode):
     """가상의 문서를 생성하는 노드"""
 
@@ -33,24 +45,36 @@ class EmbedderNode(BaseNode):
         return {"embedding": embedding}
 
 
-class RetrieverNode(BaseNode):
+class MongoRetrieverNode(BaseNode):
     """MongoDB에서 유사한 문서를 검색하는 노드"""
 
-    def __init__(self, **kwargs):
+    def __init__(
+        self, exact=True, index_name=None, limit=10, collection=None, **kwargs
+    ):
         super().__init__(**kwargs)
-        self.name = "RetrieverNode"
-        self.collection = MongoBase("manual_vectors")
+        self.name = "MongoRetrieverNode"
+        self.collection = collection
+        self.exact = exact
+        self.index_name = index_name
+        self.limit = limit
 
     def process(self, state: GraphState) -> GraphState:
         # MongoDB에서 문서 검색
-        retrieved_docs = self.collection.manual_vector_search(state["embedding"])
+        pipeline = [
+            {
+                "$vectorSearch": {
+                    "exact": self.exact,
+                    "index": self.index_name,
+                    "limit": self.limit,
+                    "path": "embedding",
+                    "queryVector": state["embedding"],
+                }
+            }
+        ]
+        return {"documents": self.collection.aggregate(pipeline)}
 
-        # 검색된 문서를 Reranker 형식으로 변환
-        formatted_docs = Tool.format_retrieved_documents(retrieved_docs)
-        return {"documents": formatted_docs}
 
-
-class RerankerNode(BaseNode):
+class SimilarityRerankerNode(BaseNode):
     """검색된 문서를 재순위화하는 노드"""
 
     def __init__(self, **kwargs):
@@ -85,3 +109,56 @@ class RerankerNode(BaseNode):
                     reranked_documents.append(doc)
 
         return {"reranked_documents": reranked_documents}
+
+
+class PopularityRerankerNode(BaseNode):
+    """인기도를 기반으로 재순위화하는 노드"""
+
+    def __init__(self, **kwargs):
+        super().__init__(**kwargs)
+        self.name = "PopularityRerankerNode"
+
+    def process(self, state: GraphState) -> GraphState:
+        return {"popularity_reranked_documents": state["documents"]}
+
+
+class MongoAggregationNode(BaseNode):
+    """문서를 집계하는 노드"""
+
+    def __init__(self, **kwargs):
+        super().__init__(**kwargs)
+        self.name = "MongoAggregationNode"
+
+    def process(self, state: GraphState) -> GraphState:
+        return {"aggregated_documents": state["documents"]}
+
+
+class ReWriterNode(BaseNode):
+    """문서를 재작성하는 노드"""
+
+    def __init__(self, **kwargs):
+        super().__init__(**kwargs)
+        self.name = "ReWriterNode"
+
+    def process(self, state: GraphState) -> GraphState:
+        return {"rewritten_query": state["aggregated_documents"]}
+
+
+class HumanNode(BaseNode):
+    def __init__(self, **kwargs):
+        super().__init__(**kwargs)
+        self.name = "ReWriterNode"
+
+    def process(self, state: GraphState) -> GraphState:
+        new_messages = []
+        if not isinstance(state["messages"][-1], ToolMessage):
+            # 사람으로부터 응답이 없는 경우
+            new_messages.append(
+                create_response("No response from human.", state["messages"][-1])
+            )
+        return {
+            # 새 메시지 추가
+            "messages": new_messages,
+            # 플래그 해제
+            "ask_human": False,
+        }

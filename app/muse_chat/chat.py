@@ -1,85 +1,82 @@
-from typing import Dict
-
-from langgraph.graph import END, START, StateGraph
-from chat_modules.core import HyDENode
+from chat_modules.condition import CheckAnswer, CheckSimilarity, Supervisor
+from chat_modules.core import (
+    EmbedderNode,
+    HyDENode,
+    MongoAggregationNode,
+    MongoRetrieverNode,
+    PopularityRerankerNode,
+    ReWriterNode,
+    SimilarityRerankerNode,
+    HumanNode,
+)
 from chat_modules.state import GraphState
+from langgraph.graph import END, START, StateGraph
 
 
-class VadaRAG:
-    def __init__(
-        self,
-        openai_api_key: str,
-        upstage_api_key: str,
-        cohere_api_key: str,
-        mongo_connection: str,
-    ):
-        # 그래프 구성
-        self.graph = self._build_graph()
+def build_graph(self) -> StateGraph:
+    """
+    LangGraph를 사용하여 노드들을 연결
+    """
+    graph = StateGraph(GraphState)
 
-    def _build_graph(self) -> StateGraph:
-        """
-        LangGraph를 사용하여 노드들을 연결
-        """
-        graph = StateGraph(GraphState)
-        graph.add_node("hyde", HyDE())
-        graph.add_node("embedder", Embedder())
-        graph.add_node("retriever", Retriever())
-        graph.add_node("reranker", Reranker())
-        graph.add_node("supervisor", Supervisor())
-        graph.add_node("similarity_reranker", SimilarityReranker())
-        graph.add_node("popularity_reranker", PopularityReranker())
-        graph.add_node("aggregation", Aggregation())
-        graph.add_node("re_writer", ReWriter())
+    graph.add_node("hyde", HyDENode())
+    graph.add_node("embedder", EmbedderNode())
+    graph.add_node("retriever", MongoRetrieverNode())
+    graph.add_node("similarity_reranker", SimilarityRerankerNode())
+    graph.add_node("popularity_reranker", PopularityRerankerNode())
+    graph.add_node("aggregation", MongoAggregationNode())
+    graph.add_node("re_writer", ReWriterNode())
+    graph.add_node("human", HumanNode())
 
-        graph.add_edge(START, "supervisor")
-        graph.set_entry_point("supervisor")
-        graph.add_conditional_edges(
-            "supervisor",
-            Supervisor(),
-            {
-                "condition1": "multi_modal",
-                "condition2": "single_modal",
-            },
-        )
-        graph.add_edge("multi_modal_hyde", "embedder")
-        graph.add_edge("single_modal_hyde", "embedder")
-        graph.add_edge("embedder", "retriever")
-        graph.add_edge("retriever", "similarity_reranker")
-        graph.add_edge("similarity_reranker", "check_similarity")
-        graph.set_entry_point("check_similarity")
-        graph.add_conditional_edges(
-            "check_similarity",
-            CheckSimilarity(),
-            {
-                "condition1": "aggregation",
-                "condition2": "no_result",
-            },
-        )
-        graph.add_edge("no_result", END)
-        graph.add_edge("aggregation", "popularity_reranker")
-        graph.set_entry_point("check_answer")
-        graph.add_conditional_edges(
-            "check_answer",
-            CheckAnswer(),
-            {
-                "condition1": END,
-                "condition2": "re_writer",
-            },
-        )
-        graph.add_edge("re_writer", "retriever")
+    graph.add_edge(START, "supervisor")
+    graph.set_entry_point("supervisor")
+    graph.add_conditional_edges(
+        "supervisor",
+        Supervisor(),
+        {
+            "condition1": "multi_modal",
+            "condition2": "single_modal",
+        },
+    )
+    graph.add_edge("multi_modal_hyde", "embedder")
+    graph.add_edge("single_modal_hyde", "embedder")
+    graph.add_edge("embedder", "retriever")
+    graph.add_edge("retriever", "similarity_reranker")
+    graph.add_edge("similarity_reranker", "check_similarity")
+    graph.set_entry_point("check_similarity")
+    graph.add_conditional_edges(
+        "check_similarity",
+        CheckSimilarity(),
+        {
+            "condition1": "aggregation",
+            "condition2": "no_result",
+        },
+    )
+    graph.add_edge("no_result", END)
+    graph.add_edge("aggregation", "popularity_reranker")
+    graph.add_edge("popularity_reranker", "human")
+    graph.add_conditional_edges(
+        "check_answer",
+        CheckAnswer(),
+        {
+            "condition1": END,
+            "condition2": "re_writer",
+        },
+    )
+    graph.add_edge("re_writer", "retriever")
 
-        # 그래프 컴파일
-        return graph.compile()
+    # 그래프 컴파일
+    return graph.compile()
 
-    def process_query(self, query: str, chat_history: list = None) -> Dict[str, Any]:
-        initial_state = GraphState(
-            query=query,
-            chat_history=chat_history or [],
-            hypothetical_doc="",
-            embedding=[],
-            documents=[],
-            reranked_documents=[],
-            response="",
-        )
 
-        return self.graph.invoke(initial_state)
+def process_query(graph: StateGraph, query: str, chat_history: list):
+    """
+    쿼리를 처리하고 응답을 스트리밍 형식으로 반환
+    """
+    initial_state = {"query": query, "chat_history": chat_history}
+
+    # LangGraph의 메시지 스트리밍 모드 사용
+    for message, metadata in graph.stream(initial_state, stream_mode="messages"):
+        # generator 노드의 응답만 스트리밍
+        if metadata["langgraph_node"] == "generator":
+            yield message.content

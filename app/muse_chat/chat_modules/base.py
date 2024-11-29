@@ -1,10 +1,12 @@
 from abc import ABC, abstractmethod
+
 from chat_modules.state import GraphState
+from langchain_core.prompts import PromptTemplate
 
 
-class BaseNode(ABC):
+class Base(ABC):
     """
-    모든 RAG 파이프라인 노드의 기본 클래스
+    모든 RAG 파이프라인 기본 클래스
     """
 
     def __init__(self, verbose: bool = False, **kwargs):
@@ -17,9 +19,13 @@ class BaseNode(ABC):
 
     def log(self, message: str, **kwargs):
         if self.verbose:
-            print(f"{self.name}: {message}")
+            print(f"{type}: {self.name}: {message}")
             for key, value in kwargs.items():
                 print(f"{key}: {value}")
 
     def __call__(self, state: GraphState) -> GraphState:
-        return self.process(state)
+        print(f"Calling {self.name}")
+        result = self.process(state)
+        if self.verbose:
+            print(f"state after {self.name}: {state}")
+        return result
