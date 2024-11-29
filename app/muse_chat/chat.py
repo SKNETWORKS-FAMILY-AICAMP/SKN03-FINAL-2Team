@@ -1,13 +1,14 @@
 from chat_modules.condition import CheckAnswer, CheckSimilarity, Supervisor
 from chat_modules.core import (
     EmbedderNode,
+    HumanNode,
     HyDENode,
     MongoAggregationNode,
     MongoRetrieverNode,
     PopularityRerankerNode,
     ReWriterNode,
     SimilarityRerankerNode,
-    HumanNode,
+    Supervisor,
 )
 from chat_modules.state import GraphState
 from langgraph.graph import END, START, StateGraph
@@ -29,7 +30,7 @@ def build_graph(self) -> StateGraph:
     graph.add_node("human", HumanNode())
 
     graph.add_edge(START, "supervisor")
-    graph.set_entry_point("supervisor")
+    graph.add_edge(START, "supervisor")
     graph.add_conditional_edges(
         "supervisor",
         Supervisor(),
@@ -56,11 +57,11 @@ def build_graph(self) -> StateGraph:
     graph.add_edge("aggregation", "popularity_reranker")
     graph.add_edge("popularity_reranker", "human")
     graph.add_conditional_edges(
-        "check_answer",
+        "human",
         CheckAnswer(),
         {
-            "condition1": END,
-            "condition2": "re_writer",
+            "accept": END,
+            "revise": "re_writer",
         },
     )
     graph.add_edge("re_writer", "retriever")
