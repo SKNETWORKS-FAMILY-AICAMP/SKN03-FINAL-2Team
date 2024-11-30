@@ -9,6 +9,8 @@ import sys
 import os
 sys.path.append(os.path.abspath(os.path.join(os.path.dirname(__file__), '../../')))
 import config
+from dotenv import load_dotenv
+
 
 class GenreStoryUpdater:
     def __init__(self):
@@ -81,7 +83,7 @@ def main():
         # processed_perfomance_details.json -> 데이터프레임 생성
         df = pd.read_json(processed_performance_details_path)
         df['genre'] = None
-
+        load_dotenv()
     updater = GenreStoryUpdater()
     updater.update_genre_and_story(df)
 

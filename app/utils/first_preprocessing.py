@@ -16,12 +16,9 @@ class F_Preprocessing:
 
     def load_data(self):
         data_list = []
-        # JSON 파일 한 줄씩 읽어서 처리
+        # JSON 파일을 로드
         with open(f'{config.file_path}/{config.per_raw}', 'r', encoding='utf-8-sig') as file:
-            for line in file:
-                # 한 줄의 JSON 문자열을 딕셔너리로 변환
-                data = json.loads(line.strip())
-                data_list.append(data)  # 리스트에 추가
+            data_list = json.load(file)
 
         # 리스트를 DataFrame으로 변환
         self.df = pd.DataFrame(data_list)
@@ -29,15 +26,16 @@ class F_Preprocessing:
     def preprocessing_data(self):
         
         # 컬럼 삭제
-        data = data.drop(columns=self.columns_to_drop)
+        self.df = self.df.drop(columns=self.columns_to_drop)
         # child 값이 'Y'가 아닌 데이터만 필터링
-        data = data[data['child'] != 'Y']
-        data = data.dropna()
-        data['percentage'] = pd.to_numeric(data['percentage'], errors='coerce')  # 값이 문자열일 경우 처리
-        data = data[data['percentage'] <= 100]
+        self.df = self.df[self.df['child'] != 'Y']
+        self.df = self.df.dropna()
+        self.df['percentage'] = pd.to_numeric(self.df['percentage'], errors='coerce')  # 값이 문자열일 경우 처리
+        self.df = self.df[self.df['percentage'] <= 100]
         # 전처리된 데이터를 새로운 JSON 파일로 저장
-        data.to_json(self.processed_data, orient='records', force_ascii=False, lines=True)
+        self.df.to_json(self.processed_data, orient='records', force_ascii=False, lines=True)
         print(f"전처리된 데이터가 {self.processed_data}에 저장되었습니다.")
+
 
     def run(self):
         self.load_data()
