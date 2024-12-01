@@ -5,6 +5,8 @@ from langgraph.graph.message import add_messages
 
 class GraphState(TypedDict):
     query: str
+    images: list
+    human_answer: str | None
     chat_history: list
     hypothetical_doc: str
     embedding: list

@@ -3,26 +3,26 @@ from pymongo.server_api import ServerApi
 
 
 class MongoBase:
-    _client = None
-    _db = None
-    _vector_db = None
+    client = None
+    db = None
+    vector_db = None
 
     @staticmethod
     def initialize(uri, db_name, vector_db_name):
-        if MongoBase._client is None:
-            MongoBase._client = MongoClient(uri, server_api=ServerApi("1"))
-            MongoBase._db = MongoBase._client[db_name]
-            MongoBase._vector_db = MongoBase._client[vector_db_name]
+        if MongoBase.client is None:
+            MongoBase.client = MongoClient(uri, server_api=ServerApi("1"))
+            MongoBase.db = MongoBase.client[db_name]
+            MongoBase.vector_db = MongoBase.client[vector_db_name]
 
     @staticmethod
     def close():
-        if MongoBase._client:
-            MongoBase._client.close()
+        if MongoBase.client:
+            MongoBase.client.close()
 
     def __init__(self, collection_name):
-        if MongoBase._db is None:
+        if MongoBase.db is None:
             raise RuntimeError("Initialize MongoBase by calling MongoBase.initialize()")
-        self.collection = MongoBase._db[collection_name]
+        self.collection = MongoBase.db[collection_name]
 
     def find(self, *args, **kwargs) -> list:
         return self.collection.find(*args, **kwargs)
@@ -50,22 +50,3 @@ class MongoBase:
     def delete_all(self):
         result = self.collection.delete_many({})
         return result.deleted_count
-
-    def manual_vector_search(
-        self, index_name, query_vector, path, limit=10, exact=True
-    ):
-        pipeline = [
-            {
-                "$vectorSearch": {
-                    "exact": exact,
-                    "index": index_name,
-                    "limit": limit,
-                    "path": "embedding",
-                    "queryVector": query_vector,
-                }
-            }
-        ]
-        return [
-            {"content": obj["content"], "metadata": obj["metadata"]}
-            for obj in self.collection.aggregate(pipeline)
-        ]
