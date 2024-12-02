@@ -2,3 +2,7 @@
 main.py
 .venv
 __pycache__
+.gitignore
+README.md
+*.json
+*.csv

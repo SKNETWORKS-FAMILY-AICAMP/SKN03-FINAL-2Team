@@ -117,7 +117,7 @@ def save_to_file(filename, data, as_json=False):
 # 메인 함수
 if __name__ == "__main__":
     # 공연 목록 조회 설정
-    START_DATE = "20240101"  # 시작일
+    START_DATE = "20230101"  # 시작일
     END_DATE = "20241231"    # 종료일
     GENRE = "GGGA"           # 뮤지컬 장르 코드
 
@@ -133,4 +133,4 @@ if __name__ == "__main__":
         time.sleep(1)  # 요청 간 대기 (API 호출 제한 방지)
 
     # 결과 저장
-    save_to_file("performance_detail_2024.json", all_details, as_json=True)
+    save_to_file("musical_details.json", all_details, as_json=True)
