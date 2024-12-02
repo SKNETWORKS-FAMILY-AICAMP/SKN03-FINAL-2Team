@@ -11,12 +11,12 @@ class Single2HyDENode(Base):
 
     def __init__(self, **kwargs):
         super().__init__(**kwargs)
-        self.name = "HyDESingleNode"
+        self.name = "Single2HyDENode"
         self.chain = Chain.set_hyde_chain(mode="single")
 
     def process(self, state: GraphState) -> GraphState:
         hypothetical_doc = self.chain.invoke({"query": state["query"]})
-        print("Single2HyDENode : ", hypothetical_doc)
+        print("Single2HyDENode : ", hypothetical_doc[0])
         return {"hypothetical_doc": hypothetical_doc}
 
 
@@ -32,7 +32,7 @@ class Multi2HyDENode(Base):
         hypothetical_doc = self.chain.invoke(
             {"query": state["query"], "image": state["image"]}
         )
-        print("Multi2HyDENode : ", hypothetical_doc)
+        print("Multi2HyDENode : ", hypothetical_doc[0])
         return {"hypothetical_doc": hypothetical_doc}
 
 
@@ -45,8 +45,8 @@ class EmbedderNode(Base):
         self.model = Model.get_embedding_model()
 
     def process(self, state: GraphState) -> GraphState:
-        embedding = self.model.get_embedding(state["hypothetical_doc"])
-        print("EmbedderNode : ", embedding)
+        embedding = self.model.embed_query(state["hypothetical_doc"])
+        print("EmbedderNode : ", embedding[0])
         return {"embedding": embedding}
 
 
@@ -54,13 +54,18 @@ class MongoRetrieverNode(Base):
     """MongoDB에서 유사한 문서를 검색하는 노드"""
 
     def __init__(
-        self, exact=True, index_name="E_embedding", limit=10, collection=None, **kwargs
+        self,
+        exact=True,
+        embedding_name="E_embedding",
+        limit=10,
+        collection=None,
+        **kwargs,
     ):
         super().__init__(**kwargs)
         self.name = "MongoRetrieverNode"
         self.collection = collection
         self.exact = exact
-        self.index_name = index_name
+        self.embedding_name = embedding_name
         self.limit = limit
 
     def process(self, state: GraphState) -> GraphState:
@@ -69,51 +74,53 @@ class MongoRetrieverNode(Base):
             {
                 "$vectorSearch": {
                     "exact": self.exact,
-                    "index": self.index_name,
-                    "limit": self.limit,
-                    "path": "embedding",
+                    "index": self.embedding_name,
+                    "path": self.embedding_name,
                     "queryVector": state["embedding"],
+                    "limit": self.limit,
                 }
             }
         ]
-        documents = self.collection.aggregate(pipeline)
-        print("MongoRetrieverNode : ", documents)
+
+        documents = list(self.collection.aggregate(pipeline))
+        print("MongoRetrieverNode : ", documents[0])
         return {"documents": documents}
 
 
 class SimilarityRerankerNode(Base):
-    """검색된 문서를 재순위화하는 노드"""
+    """문서 유사도를 기반으로 재정렬하는 노드"""
 
     def __init__(self, **kwargs):
         super().__init__(**kwargs)
-        self.name = "RerankerNode"
+        self.name = "SimilarityRerankerNode"
         self.model = Model.get_rerank_model()
 
     def process(self, state: GraphState) -> GraphState:
-        # Document 객체 리스트를 텍스트 리스트로 변환
-        doc_texts = [doc.text for doc in state["documents"]]
-        original_docs = {str(i): text for i, text in enumerate(doc_texts)}
-        # 문서 재순위화
-        reranked_results = self.model.rerank(documents=doc_texts, query=state["query"])
-        # 재순위화된 결과에서 텍스트 추출
+        # 문서가 없는 경우 빈 리스트 반환
+        if not state["documents"]:
+            return {"reranked_documents": []}
+
+        # 디서에서 텍스트 추출
+        doc_texts = [doc["E_text"] for doc in state["documents"]]
+
+        # 재정렬 수행
+        reranked_results = self.model.rerank(
+            documents=doc_texts, query=state["hypothetical_doc"]
+        )
+
+        # 재정렬된 문서 생성
         reranked_documents = []
         for result in reranked_results:
-            if isinstance(result, dict):
-                # 인덱스 기반 접근
-                if "index" in result:
-                    doc_index = str(result["index"])
-                    if doc_index in original_docs:
-                        reranked_documents.append(original_docs[doc_index])
-                # 직접 문서 접근
-                elif "document" in result:
-                    reranked_documents.append(result["document"])
-            else:
-                # 객체 기반 접근
-                doc = getattr(result, "document", None)
-                if doc is not None:
-                    reranked_documents.append(doc)
+            doc_index = result["index"] if isinstance(result, dict) else result.index
+            doc = state["documents"][doc_index].copy()
+            doc["score"] = (
+                result["relevance_score"]
+                if isinstance(result, dict)
+                else result.relevance_score
+            )
+            reranked_documents.append(doc)
 
-        print("SimilarityRerankerNode : ", reranked_documents)
+        print("SimilarityRerankerNode : ", reranked_documents[0])
         return {"reranked_documents": reranked_documents}
 
 
@@ -158,75 +165,101 @@ class MongoAggregationNode(Base):
                     merged_docs.append(merged_doc)
                     break
 
-        print("MongoAggregationNode : ", merged_docs)
+        print("MongoAggregationNode : ", merged_docs[0])
         return {"aggregated_documents": merged_docs}
 
 
 class PopularityRerankerNode(Base):
-    """인기도를 기반으로 재순위화하는 노드"""
+    """인기도를 기반으로 재정렬하는 노드"""
 
     def __init__(self, **kwargs):
         super().__init__(**kwargs)
         self.name = "PopularityRerankerNode"
 
+    def format_exhibition(self, doc):
+        """전시회 정보를 포맷팅하는 헬퍼 함수"""
+        try:
+            print(f"\nFormatting exhibition: {doc.get('E_title', '제목 없음')}")
+            formatted = f"""
+### 🎨 {doc.get('E_title', '제목 없음')}
+
+![전시회 포스터]({doc.get('E_poster', '이미지 없음')})
+
+{doc.get('E_context', '내용 없음')}
+
+**상세 정보**
+- 💰 가격: {doc.get('E_price', '가격 정보 없음')}
+- 📍 위치: {doc.get('E_place', '위치 정보 없음')}
+- 📅 날짜: {doc.get('E_date', '날짜 정보 없음')}
+- 🔗 링크: {doc.get('E_link', '링크 없음')}
+"""
+            print("Exhibition formatted successfully")
+            return formatted
+        except Exception as e:
+            print(f"Error formatting exhibition: {e}")
+            return "전시회 정보를 표시할 수 없습니다."
+
     def process(self, state: GraphState) -> GraphState:
-        # aggregated_documents를 E_ticketcast 기준으로 정렬
-        sorted_docs = sorted(
-            state["aggregated_documents"],
-            key=lambda x: x.get("E_ticketcast", 0),
-            reverse=True,  # 높은 순서대로 정렬
-        )
-        print("PopularityRerankerNode : ", sorted_docs)
-        return {"popularity_ranked_documents": sorted_docs}
+        try:
+            print("\n=== PopularityRerankerNode Process Start ===")
+
+            # 문서가 없는 경우 처리
+            if not state.get("aggregated_documents"):
+                print("No aggregated documents found")
+                return {"response": "죄송합니다. 추천할 만한 전시회를 찾지 못했습니다."}
+
+            print(
+                f"Number of aggregated documents: {len(state['aggregated_documents'])}"
+            )
+
+            # 인기도(E_ticketcast) 기준으로 정렬
+            sorted_docs = sorted(
+                state["aggregated_documents"],
+                key=lambda x: x.get("E_ticketcast", 0),
+                reverse=True,
+            )
+
+            print("Documents sorted by popularity")
+            for i, doc in enumerate(sorted_docs):
+                print(
+                    f"Doc {i+1} ticketcast: {doc.get('E_ticketcast', 0)}, title: {doc.get('E_title', '제목 없음')}"
+                )
+
+            # 전시회 정보 포맷팅
+            exhibitions = []
+            for i, doc in enumerate(sorted_docs, 1):
+                formatted = self.format_exhibition(doc)
+                exhibitions.append(formatted)
+
+            # 전체 응답 생성
+            response = "\n\n".join(exhibitions)
+
+            print(f"Final response length: {len(response)}")
+            print("=== PopularityRerankerNode Process End ===\n")
+
+            return {"response": response}
+
+        except Exception as e:
+            print(f"Error in PopularityRerankerNode: {e}")
+            return {"response": "전시회 정보를 처리하는 중 오류가 발생했습니다."}
 
 
 class HumanNode(Base):
+    """사용자 응답을 처리하는 노드"""
+
     def __init__(self, **kwargs):
         super().__init__(**kwargs)
         self.name = "HumanNode"
 
     def process(self, state: GraphState) -> GraphState:
-        # GraphState에서 현재 상태 확인
-        current_answer = state.get("human_answer")
+        # 상태에서 사용자 응답 확인
+        user_response = state.get("user_response", "revise")
+        print(f"HumanNode: Processing user response - {user_response}")
 
-        if current_answer is None:
-            # 처음 선택하는 경우에만 라디오 버튼 표시
-            answer = st.radio(
-                "추천된 전시회가 마음에 드시나요?",
-                ["만족합니다", "다른 추천을 볼래요"],
-                key="temp_human_answer",  # 임시 키로 사용
-            )
-
-            # AI 응답 메시지 표시
-            with st.chat_message("assistant"):
-                if answer == "만족합니다":
-                    st.write("좋은 선택이에요! 즐거운 관람 되시길 바랍니다. 😊")
-                else:
-                    st.write(
-                        "다른 전시회를 추천해드리도록 하겠습니다. 잠시만 기다려주세요... 🔍"
-                    )
-
-            # GraphState 업데이트
-            return {
-                "human_answer": answer,
-                "answer_type": "accept" if answer == "만족합니다" else "revise",
-            }
-        else:
-            # 이미 선택한 경우 저장된 응답 표시
-            with st.chat_message("assistant"):
-                if current_answer == "만족합니다":
-                    st.write("좋은 선택이에요! 즐거운 관람 되시길 바랍니다. 😊")
-                else:
-                    st.write(
-                        "다른 전시회를 추천해드리도록 하겠습니다. 잠시만 기다려주세요... 🔍"
-                    )
-
-            # 저장된 상태 반환
-            print("HumanNode : ", current_answer)
-            return {
-                "human_answer": current_answer,
-                "answer_type": "accept" if current_answer == "만족합니다" else "revise",
-            }
+        return {
+            "human_answer": user_response,
+            "answer_type": "accept" if user_response == "accept" else "revise",
+        }
 
 
 class ReWriterNode(Base):

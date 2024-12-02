@@ -22,9 +22,12 @@ class CheckSimilarity(Base):
     def process(self, state: GraphState) -> str:
         # reranked_documents의 점수 확인
         scores = [doc.get("score", 0) for doc in state["reranked_documents"]]
+        max_score = max(scores) if scores else 0
+
+        print(f"CheckSimilarity - Max Score: {max_score}, Threshold: {self.threshold}")
 
         # 임계값을 넘는 문서가 있는지 확인
-        if any(score >= self.threshold for score in scores):
+        if max_score >= self.threshold:
             return "high_similarity"
         return "low_similarity"
 

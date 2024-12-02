@@ -37,8 +37,8 @@ def build_graph() -> StateGraph:
         "aggregation",
         MongoAggregationNode(collection=db_collection),
     )
-    graph.add_node("re_writer", ReWriterNode())
-    graph.add_node("human", HumanNode())
+    # graph.add_node("re_writer", ReWriterNode())
+    # graph.add_node("human", HumanNode())
 
     graph.add_conditional_edges(
         START,
@@ -61,35 +61,58 @@ def build_graph() -> StateGraph:
             "low_similarity": END,
         },
     )
-    graph.add_edge("popularity_reranker", "human")
-    graph.add_conditional_edges(
-        "human",
-        CheckAnswer(),
-        {
-            "accept": END,
-            "revise": "re_writer",
-        },
-    )
-    graph.add_edge("re_writer", "retriever")
+
+    graph.add_edge("popularity_reranker", END)
+    # graph.add_edge("popularity_reranker", "human")
+
+    # graph.add_conditional_edges(
+    #     "human",
+    #     CheckAnswer(),
+    #     {
+    #         "accept": END,
+    #         "revise": "re_writer",
+    #     },
+    # )
+    # graph.add_edge("re_writer", "retriever")
 
     # 그래프 컴파일
     return graph.compile()
 
 
 def process_query(
-    graph: StateGraph, query: str, images: list = None, chat_history: list = None
+    graph: StateGraph,
+    query: str,
+    images: list = None,
+    chat_history: list = None,
 ):
     """
-    쿼리를 처리하고 응답을 스트리밍 형식으로 반환
+    쿼리를 처리하고 응답을 반환
     """
+    print("\n=== Process Query Start ===")
+    print(f"Query: {query}")
+    print(f"Images: {images[0]}")
+
     initial_state = {
         "query": query,
-        "images": images,
-        "chat_history": chat_history,
+        "images": images or [],
+        "chat_history": chat_history or [],
     }
+    print(f"Initial State: {initial_state}")
 
-    # LangGraph의 메시지 스트리밍 모드 사용
-    for message, metadata in graph.stream(initial_state, stream_mode="messages"):
-        # generator 노드의 응답만 스트리밍
-        if metadata["langgraph_node"] == "popularity_reranker":
-            yield message.content
+    # 일반 실행 모드 사용
+    try:
+        final_state = graph.invoke(initial_state)
+        print(f"Final state: {final_state}")
+
+        if isinstance(final_state, dict) and "response" in final_state:
+            response = final_state["response"]
+            print(f"Found response in final state: {response[:100]}...")
+            yield response
+        else:
+            print(f"Unexpected final state type: {type(final_state)}")
+            yield "응답을 처리하는 중 오류가 발생했습니다."
+    except Exception as e:
+        print(f"Error in process_query: {e}")
+        yield "응답을 처리하는 중 오류가 발생했습니다."
+
+    print("=== Process Query End ===\n")

@@ -8,13 +8,10 @@ import streamlit as st
 from dotenv import load_dotenv
 from st_multimodal_chatinput import multimodal_chatinput
 
-from components.sidebar import add_custom_sidebar
 from muse_chat.chat import build_graph, process_query
 from shared.mongo_base import MongoBase
 
 load_dotenv()
-
-add_custom_sidebar()
 
 
 @st.cache_resource
@@ -55,42 +52,83 @@ def reconfig_chatinput():
 
 
 def main():
+
+    st.title("💬 Muse Chat")
+    st.caption("사용자 관심사 기반 전시회 추천 가이드")
+
     graph = get_graph()
 
     # 세션 상태 초기화
     if "current_chat" not in st.session_state:
         st.session_state.current_chat = new_chat()
 
-    st.title("💬 Muse Chat")
-    st.caption("사용자 관심사 기반 전시회 추천 가이드")
+    # 채팅 메시지들을 표시
+    for message in st.session_state.current_chat["messages"]:
+        avatar = "user" if message["role"] == "user" else "assistant"
+        with st.chat_message(message["role"], avatar=avatar):
+            st.markdown(message["content"])
 
-    # with st.container():
-    #     reconfig_chatinput()
-
-    #     # 채팅 메시지들을 표시
-    #     for message in st.session_state.current_chat["messages"]:
-    #         st.chat_message(message["role"]).write(message["content"])
-
-    # # 텍스트 입력 필드
-    # if query := multimodal_chatinput():
-    #     st.write(query)
-    #     st.session_state.current_chat["messages"].extend(
-    #         [
-    #             {"role": "user", "content": query},
-    #         ]
-    #     )
+    # 사용자 입력 처리
     if query := st.chat_input("메시지를 입력하세요..."):
+        print("\n=== Exhibition Page Processing Start ===")
+        print(f"User query: {query}")
+
+        # 사용자 메시지 표시
         st.chat_message("user", avatar="user").write(query)
 
+        # 어시스턴트 응답 처리
         with st.chat_message("assistant", avatar="assistant"):
-            response = st.write_stream(process_query(graph, query))
+            # process_query에서 생성된 모든 응답을 수집
+            full_response = ""
+            try:
+                print("Collecting responses from process_query...")
+                for response in process_query(graph, query):
+                    print(f"Response type: {type(response)}")
+                    print(f"Response content: {response}")
 
-        st.session_state.current_chat["messages"].extend(
-            [
-                {"role": "user", "content": query},
-                {"role": "assistant", "content": response},
-            ]
-        )
+                    # HumanMessage 타입 처리
+                    if hasattr(response, "content"):
+                        response = response.content
+                    elif isinstance(response, list):
+                        # 리스트의 각 항목이 HumanMessage인 경우 처리
+                        response = "\n\n".join(
+                            msg.content if hasattr(msg, "content") else str(msg)
+                            for msg in response
+                        )
+                    elif not isinstance(response, str):
+                        response = str(response)
+
+                    if response:
+                        full_response += response
+
+                # 전체 응답 표시
+                print(f"Full response length: {len(full_response)}")
+                if full_response.strip():
+                    print("Displaying response with markdown")
+                    st.markdown(full_response)
+                else:
+                    print("No response to display")
+                    st.error("응답을 생성하지 못했습니다.")
+
+            except Exception as e:
+                print(f"Error processing response: {e}")
+                print(f"Error type: {type(e)}")
+                import traceback
+
+                print(f"Traceback: {traceback.format_exc()}")
+                st.error(f"오류가 발생했습니다: {str(e)}")
+
+        # 메시지 히스토리에 저장
+        if full_response.strip():
+            print("Saving to chat history")
+            st.session_state.current_chat["messages"].extend(
+                [
+                    {"role": "user", "content": query},
+                    {"role": "assistant", "content": full_response},
+                ]
+            )
+
+        print("=== Exhibition Page Processing End ===\n")
 
 
 if __name__ == "__main__":
