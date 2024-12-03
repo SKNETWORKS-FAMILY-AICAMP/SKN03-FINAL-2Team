@@ -50,7 +50,6 @@ def check_db_connection():
 
 
 def main():
-    check_db_connection()
     st.title("💬 Muse Chat")
     st.caption("사용자 관심사 기반 전시회 추천 가이드")
 
@@ -130,4 +129,5 @@ def main():
 
 
 if __name__ == "__main__":
+    check_db_connection()
     main()
