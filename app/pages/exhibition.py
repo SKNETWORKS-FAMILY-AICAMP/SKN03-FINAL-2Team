@@ -1,17 +1,10 @@
 import os
-import sys
-
-project_root_dir = os.getcwd()
-sys.path.append(project_root_dir)
 
 import streamlit as st
-from dotenv import load_dotenv
-from st_multimodal_chatinput import multimodal_chatinput
+# from st_multimodal_chatinput import multimodal_chatinput
 
 from muse_chat.chat import build_graph, process_query
 from shared.mongo_base import MongoBase
-
-load_dotenv()
 
 
 @st.cache_resource
