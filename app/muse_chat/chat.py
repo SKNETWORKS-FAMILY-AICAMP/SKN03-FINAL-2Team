@@ -21,13 +21,6 @@ def build_graph() -> StateGraph:
     """
     LangGraph를 사용하여 노드들을 연결
     """
-    if MongoBase.client is None:
-        MongoBase.initialize(
-            os.getenv("MONGO_URI"),
-            os.getenv("MONGO_DB_NAME"),
-            os.getenv("MONGO_VECTOR_DB_NAME"),
-        )
-
     vdb_collection = MongoBase.vector_db["Exhibition"]
     db_collection = MongoBase.db["Exhibition"]
 

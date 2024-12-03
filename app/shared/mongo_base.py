@@ -1,32 +1,11 @@
-import os
-
 from pymongo.mongo_client import MongoClient
 from pymongo.server_api import ServerApi
 
 
 class MongoBase:
-    _instance = None
     client = None
     db = None
     vector_db = None
-
-    @classmethod
-    def get_instance(cls):
-        if cls._instance is None:
-            cls._instance = cls()
-            cls.initialize(
-                os.getenv("MONGO_URI"),
-                os.getenv("MONGO_DB_NAME"),
-                os.getenv("MONGO_VECTOR_DB_NAME"),
-            )
-        return cls._instance
-
-    @classmethod
-    def get_collection(cls, db_type, collection_name):
-        instance = cls.get_instance()
-        if db_type == "vector":
-            return instance.vector_db[collection_name]
-        return instance.db[collection_name]
 
     @staticmethod
     def initialize(uri, db_name, vector_db_name):
@@ -71,16 +50,3 @@ class MongoBase:
     def delete_all(self):
         result = self.collection.delete_many({})
         return result.deleted_count
-
-
-def ensure_connection(func):
-    def wrapper(*args, **kwargs):
-        if MongoBase.client is None:
-            MongoBase.initialize(
-                os.getenv("MONGO_URI"),
-                os.getenv("MONGO_DB_NAME"),
-                os.getenv("MONGO_VECTOR_DB_NAME"),
-            )
-        return func(*args, **kwargs)
-
-    return wrapper

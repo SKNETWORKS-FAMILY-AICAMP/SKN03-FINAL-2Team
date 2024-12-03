@@ -137,7 +137,7 @@ def display_main_image(image_path):
             f"""
             <div class="section-container">
                 <img src="data:image/png;base64,{image_to_base64(image)}" 
-                     class="main-image">
+                class="main-image">
             </div>
         """,
             unsafe_allow_html=True,
@@ -166,13 +166,7 @@ def display_top_10(image_paths, section_key):
             # st.experimental_rerun()
 
 
-def check_db_connection():
-    if MongoBase.client is None:
-        connect_db()
-
-
 def main():
-    check_db_connection()
     col1, col2 = st.columns(2)
 
     # 왼쪽 상단: EXHIBITION
@@ -221,5 +215,5 @@ def main():
 
 
 if __name__ == "__main__":
-    check_db_connection()
+    connect_db()
     main()

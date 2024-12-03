@@ -1,10 +1,12 @@
 import os
 
 import streamlit as st
+from dotenv import load_dotenv
 from muse_chat.chat import build_graph, process_query
 from shared.mongo_base import MongoBase
 
 # from st_multimodal_chatinput import multimodal_chatinput
+load_dotenv()
 
 
 @st.cache_resource
@@ -42,11 +44,6 @@ def reconfig_chatinput():
         unsafe_allow_html=True,
     )
     return
-
-
-def check_db_connection():
-    if MongoBase.client is None:
-        connect_db()
 
 
 def main():
@@ -129,5 +126,5 @@ def main():
 
 
 if __name__ == "__main__":
-    check_db_connection()
+    connect_db()
     main()
