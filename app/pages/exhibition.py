@@ -81,8 +81,6 @@ def main():
 
     # 사용자 입력 처리
     if query := st.chat_input("메시지를 입력하세요..."):
-        print("\n=== Exhibition Page Processing Start ===")
-        print(f"User query: {query}")
 
         # 사용자 메시지 표시
         st.chat_message("user", avatar="user").write(query)
@@ -94,8 +92,6 @@ def main():
             try:
                 print("Collecting responses from process_query...")
                 for response in process_query(graph, query):
-                    print(f"Response type: {type(response)}")
-                    print(f"Response content: {response}")
 
                     # HumanMessage 타입 처리
                     if hasattr(response, "content"):
@@ -113,20 +109,12 @@ def main():
                         full_response += response
 
                 # 전체 응답 표시
-                print(f"Full response length: {len(full_response)}")
                 if full_response.strip():
-                    print("Displaying response with markdown")
                     st.markdown(full_response)
                 else:
-                    print("No response to display")
                     st.error("응답을 생성하지 못했습니다.")
 
             except Exception as e:
-                print(f"Error processing response: {e}")
-                print(f"Error type: {type(e)}")
-                import traceback
-
-                print(f"Traceback: {traceback.format_exc()}")
                 st.error(f"오류가 발생했습니다: {str(e)}")
 
         # 메시지 히스토리에 저장

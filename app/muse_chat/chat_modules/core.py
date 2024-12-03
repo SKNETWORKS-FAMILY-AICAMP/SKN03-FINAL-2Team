@@ -1,5 +1,4 @@
 import streamlit as st
-
 from muse_chat.chat_modules.base import Base
 from muse_chat.chat_modules.chain import Chain
 from muse_chat.chat_modules.model import Model
@@ -16,7 +15,6 @@ class Single2HyDENode(Base):
 
     def process(self, state: GraphState) -> GraphState:
         hypothetical_doc = self.chain.invoke({"query": state["query"]})
-        print("Single2HyDENode : ", hypothetical_doc[0])
         return {"hypothetical_doc": hypothetical_doc}
 
 
@@ -32,7 +30,6 @@ class Multi2HyDENode(Base):
         hypothetical_doc = self.chain.invoke(
             {"query": state["query"], "image": state["image"]}
         )
-        print("Multi2HyDENode : ", hypothetical_doc[0])
         return {"hypothetical_doc": hypothetical_doc}
 
 
@@ -46,7 +43,6 @@ class EmbedderNode(Base):
 
     def process(self, state: GraphState) -> GraphState:
         embedding = self.model.embed_query(state["hypothetical_doc"])
-        print("EmbedderNode : ", embedding[0])
         return {"embedding": embedding}
 
 
@@ -83,7 +79,6 @@ class MongoRetrieverNode(Base):
         ]
 
         documents = list(self.collection.aggregate(pipeline))
-        print("MongoRetrieverNode : ", documents[0])
         return {"documents": documents}
 
 
@@ -120,7 +115,6 @@ class SimilarityRerankerNode(Base):
             )
             reranked_documents.append(doc)
 
-        print("SimilarityRerankerNode : ", reranked_documents[0])
         return {"reranked_documents": reranked_documents}
 
 
@@ -165,7 +159,6 @@ class MongoAggregationNode(Base):
                     merged_docs.append(merged_doc)
                     break
 
-        print("MongoAggregationNode : ", merged_docs[0])
         return {"aggregated_documents": merged_docs}
 
 
@@ -193,24 +186,16 @@ class PopularityRerankerNode(Base):
 - 📅 날짜: {doc.get('E_date', '날짜 정보 없음')}
 - 🔗 링크: {doc.get('E_link', '링크 없음')}
 """
-            print("Exhibition formatted successfully")
             return formatted
         except Exception as e:
-            print(f"Error formatting exhibition: {e}")
             return "전시회 정보를 표시할 수 없습니다."
 
     def process(self, state: GraphState) -> GraphState:
         try:
-            print("\n=== PopularityRerankerNode Process Start ===")
 
             # 문서가 없는 경우 처리
             if not state.get("aggregated_documents"):
-                print("No aggregated documents found")
                 return {"response": "죄송합니다. 추천할 만한 전시회를 찾지 못했습니다."}
-
-            print(
-                f"Number of aggregated documents: {len(state['aggregated_documents'])}"
-            )
 
             # 인기도(E_ticketcast) 기준으로 정렬
             sorted_docs = sorted(
@@ -219,7 +204,6 @@ class PopularityRerankerNode(Base):
                 reverse=True,
             )
 
-            print("Documents sorted by popularity")
             for i, doc in enumerate(sorted_docs):
                 print(
                     f"Doc {i+1} ticketcast: {doc.get('E_ticketcast', 0)}, title: {doc.get('E_title', '제목 없음')}"
@@ -234,13 +218,9 @@ class PopularityRerankerNode(Base):
             # 전체 응답 생성
             response = "\n\n".join(exhibitions)
 
-            print(f"Final response length: {len(response)}")
-            print("=== PopularityRerankerNode Process End ===\n")
-
             return {"response": response}
 
         except Exception as e:
-            print(f"Error in PopularityRerankerNode: {e}")
             return {"response": "전시회 정보를 처리하는 중 오류가 발생했습니다."}
 
 
@@ -254,7 +234,6 @@ class HumanNode(Base):
     def process(self, state: GraphState) -> GraphState:
         # 상태에서 사용자 응답 확인
         user_response = state.get("user_response", "revise")
-        print(f"HumanNode: Processing user response - {user_response}")
 
         return {
             "human_answer": user_response,
@@ -275,5 +254,4 @@ class ReWriterNode(Base):
         rewritten_query = chain.invoke(
             {"query": state["query"], "hypothetical_doc": state["hypothetical_doc"]}
         )
-        print("ReWriterNode : ", rewritten_query)
         return {"query": rewritten_query}

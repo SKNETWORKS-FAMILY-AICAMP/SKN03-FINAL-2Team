@@ -98,31 +98,21 @@ def process_query(
     """
     쿼리를 처리하고 응답을 반환
     """
-    print("\n=== Process Query Start ===")
-    print(f"Query: {query}")
-    print(f"Images: {images[0]}")
 
     initial_state = {
         "query": query,
         "images": images or [],
         "chat_history": chat_history or [],
     }
-    print(f"Initial State: {initial_state}")
 
     # 일반 실행 모드 사용
     try:
         final_state = graph.invoke(initial_state)
-        print(f"Final state: {final_state}")
 
         if isinstance(final_state, dict) and "response" in final_state:
             response = final_state["response"]
-            print(f"Found response in final state: {response[:100]}...")
             yield response
         else:
-            print(f"Unexpected final state type: {type(final_state)}")
             yield "응답을 처리하는 중 오류가 발생했습니다."
     except Exception as e:
-        print(f"Error in process_query: {e}")
         yield "응답을 처리하는 중 오류가 발생했습니다."
-
-    print("=== Process Query End ===\n")
