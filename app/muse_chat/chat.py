@@ -1,5 +1,6 @@
 import os
 
+from dotenv import load_dotenv
 from langgraph.graph import END, START, StateGraph
 from muse_chat.chat_modules.condition import CheckAnswer, CheckSimilarity, Supervisor
 from muse_chat.chat_modules.core import (
@@ -16,11 +17,19 @@ from muse_chat.chat_modules.core import (
 from muse_chat.chat_modules.state import GraphState
 from shared.mongo_base import MongoBase
 
+load_dotenv()
+
 
 def build_graph() -> StateGraph:
     """
     LangGraph를 사용하여 노드들을 연결
     """
+    MongoBase.initialize(
+        os.getenv("MONGO_URI"),
+        os.getenv("MONGO_DB_NAME"),
+        os.getenv("MONGO_VECTOR_DB_NAME"),
+    )
+
     vdb_collection = MongoBase.vector_db["Exhibition"]
     db_collection = MongoBase.db["Exhibition"]
 
