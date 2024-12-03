@@ -12,11 +12,16 @@ load_dotenv()
 
 @st.cache_resource
 def connect_db():
-    MongoBase.initialize(
-        os.getenv("MONGO_URI"),
-        os.getenv("MONGO_DB_NAME"),
-        os.getenv("MONGO_VECTOR_DB_NAME"),
-    )
+    try:
+        MongoBase.initialize(
+            os.getenv("MONGO_URI"),
+            os.getenv("MONGO_DB_NAME"),
+            os.getenv("MONGO_VECTOR_DB_NAME"),
+        )
+        print("DB 연결 성공")
+    except Exception as e:
+        print(f"DB 연결 실패: {str(e)}")
+        st.error(f"데이터베이스 연결 오류: {str(e)}")
 
 
 @st.cache_resource
