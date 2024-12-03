@@ -1,13 +1,30 @@
+import os
+
 import streamlit as st
 from components.sidebar import add_custom_sidebar
+from dotenv import load_dotenv
 from PIL import Image
+from shared.mongo_base import MongoBase
+
+load_dotenv()
+
+
+@st.cache_resource
+def connect_db():
+    MongoBase.initialize(
+        os.getenv("MONGO_URI"),
+        os.getenv("MONGO_DB_NAME"),
+        os.getenv("MONGO_VECTOR_DB_NAME"),
+    )
+
 
 # 페이지 기본 설정
 st.set_page_config(layout="wide", initial_sidebar_state="expanded")
 
 add_custom_sidebar()
 
-st.markdown("""
+st.markdown(
+    """
 <style>
 /* 기본 스타일 */
 .stButton > button {
@@ -97,77 +114,99 @@ st.markdown("""
     padding: 20px;
 }
 </style>
-""", unsafe_allow_html=True)
+""",
+    unsafe_allow_html=True,
+)
+
 
 # 이미지를 base64로 변환하는 함수
 def image_to_base64(image):
     import base64
     from io import BytesIO
+
     buffered = BytesIO()
     image.save(buffered, format="PNG")
     return base64.b64encode(buffered.getvalue()).decode()
+
 
 # 상단 섹션 이미지 표시 함수
 def display_main_image(image_path):
     try:
         image = Image.open(image_path)
-        st.markdown(f"""
+        st.markdown(
+            f"""
             <div class="section-container">
                 <img src="data:image/png;base64,{image_to_base64(image)}" 
                      class="main-image">
             </div>
-        """, unsafe_allow_html=True)
+        """,
+            unsafe_allow_html=True,
+        )
     except Exception as e:
         st.error(f"이미지 로딩 오류: {str(e)}")
+
 
 # TOP 10 슬라이더 함수
 def display_top_10(image_paths, section_key):
     if section_key not in st.session_state:
         st.session_state[section_key] = 0
-    
+
     current_index = st.session_state[section_key]
-    visible_images = image_paths[current_index:current_index + 4]
-    
-    cols = st.columns([1, 1, 1, 1, 0.2]) 
+    visible_images = image_paths[current_index : current_index + 4]
+
+    cols = st.columns([1, 1, 1, 1, 0.2])
     for idx, img_path in enumerate(visible_images):
         with cols[idx]:
             image = Image.open(img_path)
-            st.image(image, width=150)  
+            st.image(image, width=150)
     # 토글 버튼
     with cols[4]:
-        if st.button("▶", key=f'next_{section_key}'):
+        if st.button("▶", key=f"next_{section_key}"):
             st.session_state[section_key] = (current_index + 1) % (len(image_paths) - 3)
-            # st.experimental_rerun() 
+            # st.experimental_rerun()
+
+
+def check_db_connection():
+    if MongoBase.client is None:
+        connect_db()
+
 
 def main():
+    check_db_connection()
     col1, col2 = st.columns(2)
-    
+
     # 왼쪽 상단: EXHIBITION
     with col1:
-        st.markdown("""
+        st.markdown(
+            """
             <div class="section-container">
                 <h1 class="exhibition-title">EXHIBITION</h1>
             </div>
-        """, unsafe_allow_html=True)
-    
+        """,
+            unsafe_allow_html=True,
+        )
+
     # 오른쪽 상단: 첫 번째 이미지
     with col2:
         display_main_image("static/images/display_image_1.jpg")
-    
+
     # 왼쪽 하단: 두 번째 이미지
     with col1:
         display_main_image("static/images/display_image_2.jpg")
-    
+
     # 오른쪽 하단: MUSICAL
     with col2:
-        st.markdown("""
+        st.markdown(
+            """
             <div class="section-container">
                 <h1 class="musical-title">MUSICAL</h1>
             </div>
-        """, unsafe_allow_html=True)
+        """,
+            unsafe_allow_html=True,
+        )
 
     st.markdown("---")
-    
+
     # 전시 TOP 10
     st.markdown('<h2 class="top-10-title">전시 TOP 10</h2>', unsafe_allow_html=True)
     exhibition_images = [f"static/images/display_image_{i}.jpg" for i in range(3, 13)]
@@ -180,5 +219,7 @@ def main():
     musical_images = [f"static/images/display_image_{i}.jpg" for i in range(14, 24)]
     display_top_10(musical_images, "musical_slider")
 
+
 if __name__ == "__main__":
-    main()      
+    check_db_connection()
+    main()
