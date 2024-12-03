@@ -18,8 +18,7 @@ def __set_api_key():
         "COHERE_API_KEY",
         "OPENAI_API_KEY",
     ]:
-        os.environ[i] = os.environ.get(i, None)
-        if not os.environ[i]:
+        if not os.environ.get(i):
             ssm = boto3.client("ssm")
             parameter = ssm.get_parameter(
                 Name=f"/DEV/CICD/MUSEIFY/{i}", WithDecryption=True
