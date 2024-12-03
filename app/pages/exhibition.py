@@ -1,10 +1,10 @@
 import os
 
 import streamlit as st
-# from st_multimodal_chatinput import multimodal_chatinput
-
 from muse_chat.chat import build_graph, process_query
 from shared.mongo_base import MongoBase
+
+# from st_multimodal_chatinput import multimodal_chatinput
 
 
 @st.cache_resource
@@ -44,8 +44,13 @@ def reconfig_chatinput():
     return
 
 
-def main():
+def check_db_connection():
+    if MongoBase.client is None:
+        connect_db()
 
+
+def main():
+    check_db_connection()
     st.title("💬 Muse Chat")
     st.caption("사용자 관심사 기반 전시회 추천 가이드")
 

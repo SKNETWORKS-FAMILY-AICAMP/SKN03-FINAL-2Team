@@ -1,10 +1,9 @@
 import os
 
 import streamlit as st
+from components.sidebar import add_custom_sidebar
 from dotenv import load_dotenv
 from PIL import Image
-
-from components.sidebar import add_custom_sidebar
 from shared.mongo_base import MongoBase
 
 load_dotenv()
@@ -167,7 +166,13 @@ def display_top_10(image_paths, section_key):
             # st.experimental_rerun()
 
 
+def check_db_connection():
+    if MongoBase.client is None:
+        connect_db()
+
+
 def main():
+    check_db_connection()
     col1, col2 = st.columns(2)
 
     # 왼쪽 상단: EXHIBITION
@@ -216,5 +221,4 @@ def main():
 
 
 if __name__ == "__main__":
-    connect_db()
     main()
