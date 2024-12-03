@@ -1,12 +1,29 @@
 import os
 
+import boto3
 import streamlit as st
 from components.sidebar import add_custom_sidebar
-from dotenv import load_dotenv
 from PIL import Image
 from shared.mongo_base import MongoBase
 
-load_dotenv()
+
+@st.cache_data  # 데이터를 caching 처리
+def __set_api_key():
+    for i in [
+        "MONGO_URI",
+        "MONGO_DB_NAME",
+        "MONGO_VECTOR_DB_NAME",
+        "UPSTAGE_API_KEY",
+        "COHERE_API_KEY",
+        "OPENAI_API_KEY",
+    ]:
+        os.environ[i] = os.environ.get(i, None)
+        if not os.environ[i]:
+            ssm = boto3.client("ssm")
+            parameter = ssm.get_parameter(
+                Name=f"/DEV/CICD/MUSEIFY/{i}", WithDecryption=True
+            )
+            os.environ[i] = parameter["Parameter"]["Value"]
 
 
 @st.cache_resource
@@ -215,5 +232,6 @@ def main():
 
 
 if __name__ == "__main__":
+    __set_api_key()
     connect_db()
     main()
