@@ -78,7 +78,6 @@ python-dateutil==2.9.0.post0
 python-dotenv==1.0.1
 pytz==2024.2
 pytz-deprecation-shim==0.1.0.post0
-pywin32==308
 PyYAML==6.0.2
 referencing==0.35.1
 regex==2024.11.6
