@@ -1,8 +1,8 @@
 .env
-main.py
 .venv
 __pycache__
 .gitignore
 README.md
 *.json
 *.csv
+api.py

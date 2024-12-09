@@ -123,6 +123,29 @@ def convert_csv_to_json(input_file, output_file):
     df.to_json(output_file, orient='records', lines=False, force_ascii=False, indent=4)
 
 
+# Final Step: Clean and Rename Title Columns in JSON, Remove Unnecessary Columns
+def clean_and_rename_title(input_file, output_file):
+    try:
+        # Load the JSON file as a DataFrame
+        df = pd.read_json(input_file, orient='records')
+
+        # Drop unnecessary columns if they exist
+        columns_to_remove = ['title_x', 'errmsg', 'responsetime', 'returncode']
+        for col in columns_to_remove:
+            if col in df.columns:
+                df = df.drop(columns=[col])
+
+        # Rename 'title_y' to 'title' if it exists
+        if 'title_y' in df.columns:
+            df = df.rename(columns={'title_y': 'title'})
+
+        # Save the modified DataFrame back to JSON
+        df.to_json(output_file, orient='records', lines=False, force_ascii=False, indent=4)
+        print(f"Updated JSON saved to {output_file}")
+    except Exception as e:
+        print(f"An error occurred: {e}")
+
+
 if __name__ == "__main__":
     # Define file paths and directories
     json_folder = "results"
@@ -131,7 +154,8 @@ if __name__ == "__main__":
     musical_details_json = "musical_details.json"
     musical_details_csv = "musical_details.csv"
     final_csv = "merged_result.csv"
-    final_json = "per+raw.json"
+    final_json = "percentage_raw.json"
+    cleaned_json = "per+raw.json"
 
     # Execute steps in sequence
     delete_empty_json_files(json_folder)
@@ -144,3 +168,6 @@ if __name__ == "__main__":
     merge_with_details(merged_csv, musical_details_csv, final_csv)
     remove_combined_column(final_csv)
     convert_csv_to_json(final_csv, final_json)
+
+    # Final step: Clean and rename title in JSON, and remove unnecessary columns
+    clean_and_rename_title(final_json, cleaned_json)
