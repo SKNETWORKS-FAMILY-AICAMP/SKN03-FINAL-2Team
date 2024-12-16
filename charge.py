@@ -63,8 +63,8 @@ def load_json(file_path):
         data = json.load(file)
     return data
 
-# 함수 호출 예시
-if __name__ == "__main__":
+# main 함수 정의
+def main():
     try:
         # JSON 파일에서 값 읽기
         data2 = load_json("musical_details.json")  # JSON 파일 경로 예시
@@ -112,3 +112,7 @@ if __name__ == "__main__":
         
     except Exception as e:
         print(e)
+
+# 이 파일이 직접 실행될 경우 main() 호출
+if __name__ == "__main__":
+    main()

@@ -5,4 +5,9 @@ __pycache__
 README.md
 *.json
 *.csv
-api.py
+trash/
+result/
+csv_result/
+__pycache__/
+*.pyc
+dockerfile

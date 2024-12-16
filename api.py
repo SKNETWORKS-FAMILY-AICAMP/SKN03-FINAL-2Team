@@ -4,133 +4,127 @@ import json
 import time
 from dotenv import load_dotenv
 import os
+from datetime import datetime, timedelta
 
 # 환경 변수에서 API 키 가져오기
 load_dotenv()
 API_KEY = os.getenv("KOPIS_API_KEY")
 
-# API 엔드포인트
-LIST_URL = "http://kopis.or.kr/openApi/restful/pblprfr"
-DETAIL_URL = "http://kopis.or.kr/openApi/restful/pblprfr"
+LIST_URL = "http://www.kopis.or.kr/openApi/restful/pblprfr"
+DETAIL_URL = "http://www.kopis.or.kr/openApi/restful/pblprfr"
 
 # 안전하게 태그 값 가져오기
 def safe_find_text(element, tag, default="미입력"):
-    """
-    주어진 XML Element에서 태그 값을 안전하게 추출합니다.
-    """
     found = element.find(tag)
     return found.text.strip() if found is not None and found.text.strip() else default
 
+# 날짜 범위를 31일씩 분할
+def split_date_range(start_date, end_date, max_days=31):
+    date_ranges = []
+    current_start = datetime.strptime(start_date, "%Y%m%d")
+    end_date_obj = datetime.strptime(end_date, "%Y%m%d")
+
+    while current_start <= end_date_obj:
+        current_end = min(current_start + timedelta(days=max_days - 1), end_date_obj)
+        date_ranges.append((current_start.strftime("%Y%m%d"), current_end.strftime("%Y%m%d")))
+        current_start = current_end + timedelta(days=1)
+
+    return date_ranges
+
 # 공연 목록 조회 함수
-def get_performance_list(api_key, start_date, end_date, genre, rows=10):
-    """
-    공연 목록을 조회하여 반환합니다.
-    """
+def get_performance_list(api_key, start_date, end_date, genre, rows=100):
     performances = []
-    page = 1
-    while True:
+    date_ranges = split_date_range(start_date, end_date)
+    for start, end in date_ranges:
         params = {
             "service": api_key,
-            "stdate": start_date,
-            "eddate": end_date,
+            "stdate": start,
+            "eddate": end,
             "shcate": genre,
             "rows": rows,
-            "cpage": page
+            "cpage": 1
         }
-        response = requests.get(LIST_URL, params=params)
-        if response.status_code == 200:
-            root = ET.fromstring(response.content)
-            current_page_data = []
-            for item in root.findall("db"):
-                current_page_data.append({
-                    "id": safe_find_text(item, "mt20id"),
-                    "title": safe_find_text(item, "prfnm"),
-                    "start_date": safe_find_text(item, "prfpdfrom"),
-                    "end_date": safe_find_text(item, "prfpdto")
-                })
-            if not current_page_data:  # 더 이상 데이터가 없으면 종료
+        while True:
+            response = requests.get(LIST_URL, params=params)
+            if response.status_code == 200:
+                root = ET.fromstring(response.content)
+                current_page_data = []
+                for item in root.findall("db"):
+                    performance_id = safe_find_text(item, "mt20id")
+                    if performance_id == "미입력":
+                        continue
+                    current_page_data.append({
+                        "id": performance_id,
+                        "title": safe_find_text(item, "prfnm"),
+                        "start_date": safe_find_text(item, "prfpdfrom"),
+                        "end_date": safe_find_text(item, "prfpdto")
+                    })
+                performances.extend(current_page_data)
+                if len(current_page_data) < rows:
+                    break
+                params["cpage"] += 1
+            else:
                 break
-            performances.extend(current_page_data)
-            page += 1
-        else:
-            break
     return performances
 
 # 공연 상세 조회 함수
 def get_performance_detail(api_key, performance_id):
-    """
-    공연 상세 정보를 가져옵니다.
-    """
     url = f"{DETAIL_URL}/{performance_id}?service={api_key}"
     response = requests.get(url)
-
     if response.status_code == 200:
         try:
-            # XML 데이터 파싱
             root = ET.fromstring(response.content)
-            db = root.find("db")  # <db> 태그 탐색
-
+            db = root.find("db")
             if db is None:
                 return None
-
-            # 공연 상세 정보 추출
-            detail = {
+            return {
                 "title": safe_find_text(db, "prfnm"),
                 "start_date": safe_find_text(db, "prfpdfrom"),
                 "end_date": safe_find_text(db, "prfpdto"),
                 "genre": safe_find_text(db, "genrenm"),
                 "place": safe_find_text(db, "fcltynm"),
                 "poster": safe_find_text(db, "poster"),
-                "prfstate": safe_find_text(db, "prfstate"),
+                "state": safe_find_text(db, "prfstate"),
                 "runtime": safe_find_text(db, "prfruntime"),
                 "age": safe_find_text(db, "prfage"),
                 "cast": safe_find_text(db, "prfcast"),
                 "crew": safe_find_text(db, "prfcrew"),
                 "story": safe_find_text(db, "sty"),
                 "ticket_price": safe_find_text(db, "pcseguidance"),
-                "host": safe_find_text(db, "entrpsnmH"),
-                "sponsor": safe_find_text(db, "entrpsnmS"),
-                "musical_license": safe_find_text(db, "musicallicense"),
-                "musical_create": safe_find_text(db, "musicalcreate"),
                 "time": safe_find_text(db, "dtguidance"),
                 "additional_images": [
                     safe_find_text(styurl, ".") for styurl in db.findall("styurls/styurl")
                 ]
             }
-            return detail
-        except Exception:
+        except:
             return None
     else:
         return None
 
-# 파일에 저장하는 함수
+# 파일에 저장
 def save_to_file(filename, data, as_json=False):
-    """
-    데이터를 파일에 저장합니다.
-    """
+    
     with open(filename, "w", encoding="utf-8") as f:
         if as_json:
             json.dump(data, f, ensure_ascii=False, indent=4)
         else:
             f.write(data)
 
-# 메인 함수
-if __name__ == "__main__":
-    # 공연 목록 조회 설정
+# main 함수 추가
+def main():
     START_DATE = "20230101"  # 시작일
     END_DATE = "20241231"    # 종료일
     GENRE = "GGGA"           # 뮤지컬 장르 코드
 
-    # 공연 목록 가져오기
-    performance_list = get_performance_list(API_KEY, START_DATE, END_DATE, GENRE)
-
-    # 공연 상세 정보 가져오기 (전체 데이터 처리)
+    performance_list = get_performance_list(API_KEY, START_DATE, END_DATE, GENRE, rows=100)
     all_details = []
-    for performance in performance_list:  # 전체 공연 처리
+    for performance in performance_list:
         detail = get_performance_detail(API_KEY, performance["id"])
         if detail:
             all_details.append(detail)
-        time.sleep(1)  # 요청 간 대기 (API 호출 제한 방지)
-
-    # 결과 저장
+        time.sleep(1)  # API 호출 간 대기
     save_to_file("musical_details.json", all_details, as_json=True)
+
+# 이 파일이 직접 실행될 경우 main() 호출
+if __name__ == "__main__":
+    main()

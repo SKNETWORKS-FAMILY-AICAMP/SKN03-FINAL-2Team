@@ -2,7 +2,6 @@ import os
 import json
 import pandas as pd
 
-
 # Step 1: Remove empty JSON files
 def delete_empty_json_files(folder_path):
     for file_name in os.listdir(folder_path):
@@ -15,7 +14,6 @@ def delete_empty_json_files(folder_path):
                     os.remove(file_path)
             except Exception:
                 pass
-
 
 # Step 2: Convert JSON to CSV
 def convert_json_to_csv(input_folder, output_folder):
@@ -34,7 +32,6 @@ def convert_json_to_csv(input_folder, output_folder):
             except Exception:
                 pass
 
-
 # Step 3: Add percentage column
 def add_percentage_column(folder_path):
     for file_name in os.listdir(folder_path):
@@ -45,7 +42,6 @@ def add_percentage_column(folder_path):
                 df['percentage'] = ((df['totnmrs'] / (df['prfdtcnt'] * df['seatcnt'])) * 100).round(2)
                 df.to_csv(file_path, index=False)
 
-
 # Step 4: Remove rows with null percentage
 def remove_null_percentage_rows(folder_path):
     for file_name in os.listdir(folder_path):
@@ -55,7 +51,6 @@ def remove_null_percentage_rows(folder_path):
             if 'percentage' in df.columns:
                 df = df.dropna(subset=['percentage'])
                 df.to_csv(file_path, index=False)
-
 
 # Step 5: Combine title, prfnmfct, and prfnmplc columns
 def combine_columns(folder_path):
@@ -68,7 +63,6 @@ def combine_columns(folder_path):
                 df = df[['combined', 'percentage']]
                 df.to_csv(file_path, index=False)
 
-
 # Step 6: Merge all CSV files
 def merge_csv_files(folder_path, output_file):
     dataframes = []
@@ -80,7 +74,6 @@ def merge_csv_files(folder_path, output_file):
     if dataframes:
         merged_df = pd.concat(dataframes, ignore_index=True)
         merged_df.to_csv(output_file, index=False)
-
 
 # Step 7: Convert musical_details.json to CSV with 'combined' column
 def convert_musical_details(input_file, output_file):
@@ -95,7 +88,6 @@ def convert_musical_details(input_file, output_file):
     except Exception:
         pass
 
-
 # Step 8: Merge merged CSV with musical_details.csv
 def merge_with_details(file1, file2, output_file):
     try:
@@ -107,7 +99,6 @@ def merge_with_details(file1, file2, output_file):
     except Exception:
         pass
 
-
 # Step 9: Remove combined column
 def remove_combined_column(file_path):
     if os.path.exists(file_path):
@@ -116,12 +107,10 @@ def remove_combined_column(file_path):
             df = df.drop(columns=['combined'])
             df.to_csv(file_path, index=False)
 
-
 # Step 10: Convert final CSV to JSON
 def convert_csv_to_json(input_file, output_file):
     df = pd.read_csv(input_file)
     df.to_json(output_file, orient='records', lines=False, force_ascii=False, indent=4)
-
 
 # Final Step: Clean and Rename Title Columns in JSON, Remove Unnecessary Columns
 def clean_and_rename_title(input_file, output_file):
@@ -141,12 +130,11 @@ def clean_and_rename_title(input_file, output_file):
 
         # Save the modified DataFrame back to JSON
         df.to_json(output_file, orient='records', lines=False, force_ascii=False, indent=4)
-        print(f"Updated JSON saved to {output_file}")
     except Exception as e:
         print(f"An error occurred: {e}")
 
-
-if __name__ == "__main__":
+# main 함수 정의
+def main():
     # Define file paths and directories
     json_folder = "results"
     csv_folder = "csv_results"
@@ -168,6 +156,8 @@ if __name__ == "__main__":
     merge_with_details(merged_csv, musical_details_csv, final_csv)
     remove_combined_column(final_csv)
     convert_csv_to_json(final_csv, final_json)
-
-    # Final step: Clean and rename title in JSON, and remove unnecessary columns
     clean_and_rename_title(final_json, cleaned_json)
+
+# 이 파일이 직접 실행될 경우 main() 호출
+if __name__ == "__main__":
+    main()
