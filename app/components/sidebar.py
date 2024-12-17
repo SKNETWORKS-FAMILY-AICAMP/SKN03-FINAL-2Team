@@ -63,8 +63,8 @@ def add_custom_sidebar():
         <a href="musical" class="sidebar-item" target="_self">
             <span>🎭 musical</span>
         </a>
-        <a href="search" class="sidebar-item" target="_self">
-            <span>🔍 검색</span>
+        <a href="musical_chat" class="sidebar-item" target="_self">
+            <span>musical ChatBot</span>
         </a>
         <a href="suggestions" class="sidebar-item" target="_self">
             <span>👤 건의 사항</span>

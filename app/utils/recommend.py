@@ -3,6 +3,7 @@ import numpy as np
 import pickle
 from DeepFM import weighted_loss, FMInteraction
 from tensorflow.keras.models import load_model
+from datetime import datetime   
 import sys
 import os
 sys.path.append(os.path.abspath(os.path.join(os.path.dirname(__file__), '../../')))
@@ -148,6 +149,52 @@ class Recommender:
 
         """콘솔 테스트용 출력 코드"""    
         # return final_recommendations[['title', 'genre', 'cast', 'predicted_score']]            
+
+    def score(self, cast, genre):
+        # 1. 데이터 인코딩
+        cast_encoded = self.label_encoders['cast'].get(cast, -1)
+        genre_encoded = self.label_encoders['genre'].get(genre, -1)
+
+        if cast_encoded == -1 or genre_encoded == -1:
+            return []
+
+        X = self.data.copy()
+        title_encoder = self.label_encoders['title']
+
+        X['title'] = X['title'].map(title_encoder)
+        X['cast'] = X['cast'].map(self.label_encoders['cast'])
+        X['genre'] = X['genre'].map(self.label_encoders['genre'])
+        
+        # NaN 제거
+        X = X.dropna(subset=['title', 'cast', 'genre'])
+        
+        # 2. 모델 예측
+        try:
+            predictions = self.model.predict([X['title'].values, 
+                                            X['cast'].values, 
+                                            X['genre'].values])
+            X['predicted_score'] = predictions
+        except Exception as e:
+            print(f"[ERROR] 모델 예측 중 오류 발생: {e}")
+            return []
+
+        # 3. 현재 상영 중인 데이터 필터링
+        current_date = datetime.now().strftime('%Y.%m.%d')
+        active_data = self.reference_data[self.reference_data["end_date"] > current_date]
+        active_titles = set(active_data["title"])
+
+        # 4. 점수가 계산된 데이터와 상영 중인 데이터 매칭
+        X = X[X['title'].isin([title_encoder.get(title, -1) for title in active_titles])]
+        
+        if X.empty:
+            print("[DEBUG] 현재 상영 중인 타이틀이 없습니다.")
+            return []
+
+        # 5. 상위 5개 타이틀 반환
+        top_recommendations = X.sort_values(by="predicted_score", ascending=False).head(7)
+        top_titles = top_recommendations['title'].map({v: k for k, v in title_encoder.items()}).tolist()
+
+        return top_titles
 
 
 """테스트 입력"""
