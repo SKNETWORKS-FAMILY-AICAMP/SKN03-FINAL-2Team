@@ -1,155 +1,136 @@
+import os
+
+import boto3
 import streamlit as st
-from components.sidebar import add_custom_sidebar
-from PIL import Image
+from muse_chat.chat import build_graph, process_query
+from shared.mongo_base import MongoBase
 
-add_custom_sidebar()
+# from st_multimodal_chatinput import multimodal_chatinput
 
-st.markdown("""
-<style>
-.stButton > button {
-    background-color: transparent;
-    border: none;
-    color: black;
-    font-size: 24px;
-}
 
-.header-text {
-    font-size: 24px;
-    margin-bottom: 30px;
-    text-align: center;
-}
+@st.cache_data  # 데이터를 caching 처리
+def __set_api_key():
+    for i in [
+        "MONGO_URI",
+        "MONGO_DB_NAME",
+        "MONGO_VECTOR_DB_NAME",
+        "UPSTAGE_API_KEY",
+        "COHERE_API_KEY",
+        "OPENAI_API_KEY",
+    ]:
+        if not os.environ.get(i):
+            ssm = boto3.client("ssm")
+            parameter = ssm.get_parameter(
+                Name=f"/DEV/CICD/MUSEIFY/{i}", WithDecryption=True
+            )
+            os.environ[i] = parameter["Parameter"]["Value"]
 
-.input-section {
-    display: flex;
-    gap: 20px;
-    margin-bottom: 30px;
-}
 
-.upload-section {
-    background-color: #f0f0f0;
-    padding: 20px;
-    border-radius: 10px;
-    text-align: center;
-    margin-top: 20px;
-}
+@st.cache_resource
+def connect_db():
+    MongoBase.initialize(
+        os.getenv("MONGO_URI"),
+        os.getenv("MONGO_DB_NAME"),
+        os.getenv("MONGO_VECTOR_DB_NAME"),
+    )
 
-/* 검색 입력 필드 스타일 */
-.stTextInput > div > div > input {
-    border-radius: 20px;
-    padding-left: 40px;
-    background-image: url('data:image/svg+xml;utf8,<svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="11" cy="11" r="8"></circle><line x1="21" y1="21" x2="16.65" y2="16.65"></line></svg>');
-    background-repeat: no-repeat;
-    background-position: 12px center;
-}
-</style>
-""", unsafe_allow_html=True)
 
-st.markdown("# 전시회 chat")
+@st.cache_resource
+def get_graph():
+    return build_graph()
 
-st.markdown("""
-<div class="header-text">
-    좋아하는 사진이나 감성을 알려주세요
-</div>
-""", unsafe_allow_html=True)
 
-# 입력 섹션
-col1, col2 = st.columns([2, 1])
+def new_chat():
+    return {"messages": []}
 
-with col1:
-    # 검색 입력 필드
-    st.markdown("### 좋아하는 그림의 특징")
-    search_feature = st.text_input("", placeholder="바로크 화풍", key="feature")
-    st.markdown("### 좋아하는 화가")
-    search_artist = st.text_input("", placeholder="박종명", key="artist")
 
-with col2:
-    # 이미지 업로드 섹션
-    st.markdown("### 좋아하는 사진")
-    uploaded_file = st.file_uploader("", type=['png', 'jpg', 'jpeg'])
-    
-    if uploaded_file is not None:
-        image = Image.open(uploaded_file)
-        st.image(image, use_container_width=True)
-    else:
-        st.markdown("""
-            <div style="
-                width: 100%;
-                height: 200px;
-                background-color: #f0f0f0;
-                display: flex;
-                align-items: center;
-                justify-content: center;
-                border-radius: 10px;
-            ">
-                <svg width="50" height="50" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
-                    <rect x="3" y="3" width="18" height="18" rx="2" ry="2"></rect>
-                    <circle cx="8.5" cy="8.5" r="1.5"></circle>
-                    <polyline points="21 15 16 10 5 21"></polyline>
-                </svg>
-            </div>
-        """, unsafe_allow_html=True)
+def reconfig_chatinput():
+    st.markdown(
+        """
+    <style>
+        div[data-testid="stVerticalBlock"] div[data-testid="stVerticalBlock"]:first-of-type {
+            position: fixed;
+            bottom: 0;
+            width: 100%; /* Span the full width of the viewport */;
+            background-color: #0E117;
+            z-index: 1000;
+            /* Other styles as needed */    
+        }
+    </style>
+    """,
+        unsafe_allow_html=True,
+    )
+    return
 
-if search_feature:
-    st.markdown("""
-        <div style="
-            position: absolute;
-            right: 10px;
-            top: 50%;
-            width: 24px;
-            height: 24px;
-            background-color: #gray;
-            border-radius: 50%;
-            display: flex;
-            align-items: center;
-            justify-content: center;
-            color: white;
-        ">
-            1
-        </div>
-    """, unsafe_allow_html=True)
 
-if st.button("제출하기"):
-    st.markdown("### 챗봇 왈 : 당신에게 추천드리는 전시회입니다.")
-    
-    # 메인 추천 결과
-    col1, col2 = st.columns([2, 1])
-    
-    with col1:
-        st.image("static/images/display_image_37.jpg", width=400)
-    with col2:
-        st.markdown(f"""
-        - 제목 : {search_artist}의 {search_feature} 작품
-        - 일시 : 2024.01.01 - 2024.12.31
-        - 위치 : 예술의 전당
-        - 화가 : {search_artist}
-        - 가격 : 30,000원
-        - 간단 내용 : 바로크 시대의 대표적인 작품
-        - 링크 : http://localhost:8501
-        """)
+def main():
+    st.title("💬 Muse Chat")
+    st.caption("사용자 관심사 기반 전시회 추천 가이드")
 
-    st.markdown("### 유사한 전시회")
-    col1, col2, col3 = st.columns(3)
+    graph = get_graph()
 
-    with col1:
-        st.image("static/images/display_image_1.jpg", use_container_width=True)
-        st.markdown("""
-        - 제목:
-        - 가격:
-        - 링크:
-        """)
+    # 세션 상태 초기화
+    if "current_chat" not in st.session_state:
+        st.session_state.current_chat = new_chat()
 
-    with col2:
-        st.image("static/images/display_image_2.jpg", use_container_width=True)
-        st.markdown("""
-        - 제목:
-        - 가격:
-        - 링크:
-        """)
+    # 채팅 메시지들을 표시
+    for message in st.session_state.current_chat["messages"]:
+        avatar = "user" if message["role"] == "user" else "assistant"
+        with st.chat_message(message["role"], avatar=avatar):
+            st.markdown(message["content"])
 
-    with col3:
-        st.image("static/images/display_image_3.jpg", use_container_width=True)
-        st.markdown("""
-        - 제목:
-        - 가격:
-        - 링크:
-        """)
+    # 사용자 입력 처리
+    if query := st.chat_input("메시지를 입력하세요..."):
+
+        # 사용자 메시지 표시
+        st.chat_message("user", avatar="user").write(query)
+
+        # 어시스턴트 응답 처리
+        with st.chat_message("assistant", avatar="assistant"):
+            # process_query에서 생성된 모든 응답을 수집
+            full_response = ""
+            try:
+                print("Collecting responses from process_query...")
+                for response in process_query(graph, query):
+
+                    # HumanMessage 타입 처리
+                    if hasattr(response, "content"):
+                        response = response.content
+                    elif isinstance(response, list):
+                        # 리스트의 각 항목이 HumanMessage인 경우 처리
+                        response = "\n\n".join(
+                            msg.content if hasattr(msg, "content") else str(msg)
+                            for msg in response
+                        )
+                    elif not isinstance(response, str):
+                        response = str(response)
+
+                    if response:
+                        full_response += response
+
+                # 전체 응답 표시
+                if full_response.strip():
+                    st.markdown(full_response)
+                else:
+                    st.error("응답을 생성하지 못했습니다.")
+
+            except Exception as e:
+                st.error(f"오류가 발생했습니다: {str(e)}")
+
+        # 메시지 히스토리에 저장
+        if full_response.strip():
+            print("Saving to chat history")
+            st.session_state.current_chat["messages"].extend(
+                [
+                    {"role": "user", "content": query},
+                    {"role": "assistant", "content": full_response},
+                ]
+            )
+
+        print("=== Exhibition Page Processing End ===\n")
+
+
+if __name__ == "__main__":
+    __set_api_key()
+    connect_db()
+    main()
