@@ -11,7 +11,7 @@ main_dir = os.path.abspath(os.path.join(current_dir, ".."))
 sys.path.append(main_dir)
 
 # utils 디렉토리 경로 추가
-config_dir = os.path.abspath(os.path.join(current_dir, "..\.."))
+config_dir = os.path.abspath(os.path.join(current_dir, "../.."))
 sys.path.append(config_dir)
 import config
 import pandas as pd
