@@ -53,7 +53,7 @@ def add_custom_sidebar():
     """, unsafe_allow_html=True)
 
     st.markdown("""
-    <div class="custom-sidebar">
+      <div class="custom-sidebar">
         <a href="." class="sidebar-logo" target="_self">
             <img src="static/images/logo.png" alt="Logo" class="sidebar-logo">
         </a>
@@ -64,7 +64,7 @@ def add_custom_sidebar():
             <span>🎭 musical</span>
         </a>
         <a href="musical_chat" class="sidebar-item" target="_self">
-            <span>musical ChatBot</span>
+            <span>🔍 musical ChatBot</span>
         </a>
         <a href="suggestions" class="sidebar-item" target="_self">
             <span>👤 건의 사항</span>
