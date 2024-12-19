@@ -6,12 +6,15 @@ import os
 import json
 import sys
 
+# 현재 파일의 디렉토리 경로
 current_dir = os.path.dirname(os.path.abspath(__file__))
 
+# main.py 경로 추가 (app 디렉토리)
 main_dir = os.path.abspath(os.path.join(current_dir, ".."))
 if main_dir not in sys.path:
     sys.path.append(main_dir)
 
+# config.py가 있는 루트 디렉토리 경로 추가
 config_dir = os.path.abspath(os.path.join(current_dir, "../.."))
 if config_dir not in sys.path:
     sys.path.append(config_dir)
