@@ -5,6 +5,8 @@ from components.tool_module import tools
 import os
 import json
 import sys
+import boto3
+import streamlit as st
 
 current_dir = os.path.dirname(os.path.abspath(__file__))
 
@@ -56,8 +58,25 @@ prompt = PromptTemplate(
     template=prompt_text
 )
 
-# LLM 초기화
-llm = ChatOpenAI(model="gpt-4o-mini", streaming=True, api_key=os.getenv("OPENAI_API_KEY"))
+@st.cache_data
+def __set_api_key():
+    if not os.environ.get("OPENAI_API_KEY"):
+        ssm = boto3.client("ssm")
+        parameter = ssm.get_parameter(
+            Name=f"/DEV/CICD/MUSEIFY/OPENAI_API_KEY", 
+            WithDecryption=True
+        )
+        os.environ["OPENAI_API_KEY"] = parameter["Parameter"]["Value"]
+
+# API 키 설정 실행
+__set_api_key()
+
+# OpenAI 모델 초기화
+llm = ChatOpenAI(
+    model="gpt-4o-mini", 
+    streaming=True, 
+    api_key=os.getenv("OPENAI_API_KEY")
+)
 
 # 에이전트 생성
 agent_runnable = create_openai_functions_agent(llm, tools, prompt)
