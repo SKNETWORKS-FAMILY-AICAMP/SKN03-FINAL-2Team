@@ -7,12 +7,10 @@ import json
 import sys
 # main.py 경로 추가
 current_dir = os.path.dirname(os.path.abspath(__file__))
-main_dir = os.path.abspath(os.path.join(current_dir, ".."))
-sys.path.append(main_dir)
+root_dir = os.path.dirname(os.path.dirname(current_dir))  # app 폴더의 상위 디렉토리
 
-# utils 디렉토리 경로 추가
-config_dir = os.path.abspath(os.path.join(current_dir, "../.."))
-sys.path.append(config_dir)
+if root_dir not in sys.path:
+    sys.path.append(root_dir)
 import config
 import pandas as pd
 from langchain_core.agents import AgentFinish
