@@ -18,6 +18,7 @@ COPY config.py /config.py
 
 # app 디렉토리 복사
 COPY app/ /app/
+COPY data_modules/ /data_modules/
 
 # Python 패키지 설치
 RUN pip install --no-cache-dir -r requirements.txt
