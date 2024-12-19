@@ -1,17 +1,29 @@
 import os
-import sys
 
-project_root_dir = os.getcwd()
-sys.path.append(project_root_dir)
-
+import boto3
 import streamlit as st
-from dotenv import load_dotenv
-from st_multimodal_chatinput import multimodal_chatinput
-
 from muse_chat.chat import build_graph, process_query
 from shared.mongo_base import MongoBase
 
-load_dotenv()
+# from st_multimodal_chatinput import multimodal_chatinput
+
+
+@st.cache_data  # 데이터를 caching 처리
+def __set_api_key():
+    for i in [
+        "MONGO_URI",
+        "MONGO_DB_NAME",
+        "MONGO_VECTOR_DB_NAME",
+        "UPSTAGE_API_KEY",
+        "COHERE_API_KEY",
+        "OPENAI_API_KEY",
+    ]:
+        if not os.environ.get(i):
+            ssm = boto3.client("ssm")
+            parameter = ssm.get_parameter(
+                Name=f"/DEV/CICD/MUSEIFY/{i}", WithDecryption=True
+            )
+            os.environ[i] = parameter["Parameter"]["Value"]
 
 
 @st.cache_resource
@@ -52,7 +64,6 @@ def reconfig_chatinput():
 
 
 def main():
-
     st.title("💬 Muse Chat")
     st.caption("사용자 관심사 기반 전시회 추천 가이드")
 
@@ -70,8 +81,6 @@ def main():
 
     # 사용자 입력 처리
     if query := st.chat_input("메시지를 입력하세요..."):
-        print("\n=== Exhibition Page Processing Start ===")
-        print(f"User query: {query}")
 
         # 사용자 메시지 표시
         st.chat_message("user", avatar="user").write(query)
@@ -83,8 +92,6 @@ def main():
             try:
                 print("Collecting responses from process_query...")
                 for response in process_query(graph, query):
-                    print(f"Response type: {type(response)}")
-                    print(f"Response content: {response}")
 
                     # HumanMessage 타입 처리
                     if hasattr(response, "content"):
@@ -102,20 +109,12 @@ def main():
                         full_response += response
 
                 # 전체 응답 표시
-                print(f"Full response length: {len(full_response)}")
                 if full_response.strip():
-                    print("Displaying response with markdown")
                     st.markdown(full_response)
                 else:
-                    print("No response to display")
                     st.error("응답을 생성하지 못했습니다.")
 
             except Exception as e:
-                print(f"Error processing response: {e}")
-                print(f"Error type: {type(e)}")
-                import traceback
-
-                print(f"Traceback: {traceback.format_exc()}")
                 st.error(f"오류가 발생했습니다: {str(e)}")
 
         # 메시지 히스토리에 저장
@@ -132,4 +131,6 @@ def main():
 
 
 if __name__ == "__main__":
+    __set_api_key()
+    connect_db()
     main()
