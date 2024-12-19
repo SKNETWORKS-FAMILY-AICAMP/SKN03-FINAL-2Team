@@ -4,6 +4,9 @@ import boto3
 import streamlit as st
 from components.sidebar import add_custom_sidebar
 from PIL import Image
+import sys
+import os
+import importlib.util
 from shared.mongo_base import MongoBase
 
 
@@ -32,7 +35,6 @@ def connect_db():
         os.getenv("MONGO_DB_NAME"),
         os.getenv("MONGO_VECTOR_DB_NAME"),
     )
-
 
 # 페이지 기본 설정
 st.set_page_config(layout="wide", initial_sidebar_state="expanded")
