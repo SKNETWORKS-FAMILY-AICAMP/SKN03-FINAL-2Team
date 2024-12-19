@@ -13,7 +13,10 @@ RUN apt-get update && apt-get install -y \
     git \
     && rm -rf /var/lib/apt/lists/*
 
-# 필요한 파일들 복사
+# config.py 먼저 복사
+COPY config.py /config.py
+
+# app 디렉토리 복사
 COPY app/ /app/
 
 # Python 패키지 설치
