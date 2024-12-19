@@ -1,4 +1,3 @@
-똑바로 봐라 
 aiohappyeyeballs==2.4.3
 aiohttp==3.11.8
 aiosignal==1.3.1
