@@ -11,3 +11,4 @@ csv_result/
 __pycache__/
 *.pyc
 dockerfile
+.dockerignore
