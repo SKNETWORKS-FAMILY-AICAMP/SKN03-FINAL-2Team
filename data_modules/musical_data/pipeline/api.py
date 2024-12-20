@@ -6,13 +6,19 @@ from datetime import datetime, timedelta
 import time
 import boto3
 
+def __set_api_key():
+    if not os.environ.get("KOPIS_API_KEY"):
+        ssm = boto3.client("ssm", region_name="ap-northeast-2")
+        parameter = ssm.get_parameter(
+            Name=f"/DEV/CICD/MUSEIFY/KOPIS_API_KEY", 
+            WithDecryption=True
+        )
+        os.environ["KOPIS_API_KEY"] = parameter["Parameter"]["Value"]
 
-def get_param(parameter_name):
-    ssm = boto3.client('ssm', region_name="ap-northeast-2")
-    response = ssm.get_parameter(Name=parameter_name, WithDecryption=True)
-    return response['Parameter']['Value']
+# API 키 설정 실행
+__set_api_key()
 
-API_KEY = get_param("KOPIS_API_KEY")
+API_KEY = os.getenv("KOPIS_API_KEY")
 LIST_URL = "http://www.kopis.or.kr/openApi/restful/pblprfr"
 DETAIL_URL = "http://www.kopis.or.kr/openApi/restful/pblprfr"
 
@@ -114,7 +120,7 @@ def add_detailed_info(df):
 
 # Main 함수
 def main():
-    START_DATE = "20241220"
+    START_DATE = "20230101"
     END_DATE = "20241231"
     GENRE = "GGGA"
 

@@ -6,12 +6,19 @@ import time
 import boto3
 
 # AWS Parameter Store에서 환경 변수 가져오기
-def get_param(parameter_name):
-    ssm = boto3.client('ssm', region_name="ap-northeast-2")
-    response = ssm.get_parameter(Name=parameter_name, WithDecryption=True)
-    return response['Parameter']['Value']
+def __set_api_key():
+    if not os.environ.get("KOPIS_API_KEY"):
+        ssm = boto3.client("ssm", region_name="ap-northeast-2")
+        parameter = ssm.get_parameter(
+            Name=f"/DEV/CICD/MUSEIFY/KOPIS_API_KEY", 
+            WithDecryption=True
+        )
+        os.environ["KOPIS_API_KEY"] = parameter["Parameter"]["Value"]
 
-API_KEY = get_param("KOPIS_API_KEY")
+# API 키 설정 실행
+__set_api_key()
+
+API_KEY = os.getenv("KOPIS_API_KEY")
 DETAIL_URL = "http://kopis.or.kr/openApi/restful/prfstsPrfByFct"
 
 # 이후 기존 코드 유지...

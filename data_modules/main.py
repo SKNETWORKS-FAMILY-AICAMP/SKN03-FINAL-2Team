@@ -1,5 +1,5 @@
 # main.py
-from musical_data import api, charge, process
+from .musical_data.pipeline import api, charge, process
 
 
 def main():

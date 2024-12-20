@@ -3,23 +3,27 @@ import boto3
 import os
 
 # AWS Parameter Store에서 환경 변수 가져오기
-def get_param(parameter_name):
-    ssm = boto3.client('ssm', region_name="ap-northeast-2")
-    response = ssm.get_parameter(Name=parameter_name, WithDecryption=True)
-    return response['Parameter']['Value']
+def __set_api_key():
+    if not os.environ.get("KOPIS_API_KEY"):
+        ssm = boto3.client("ssm", region_name="ap-northeast-2")
+        parameter = ssm.get_parameter(
+            Name=f"/DEV/CICD/MUSEIFY/KOPIS_API_KEY", 
+            WithDecryption=True
+        )
+        os.environ["KOPIS_API_KEY"] = parameter["Parameter"]["Value"]
+
+# API 키 설정 실행
+__set_api_key()
+
+API_KEY = os.getenv("KOPIS_API_KEY")
 
 # S3 클라이언트 초기화
-s3_client = boto3.client(
-    's3',
-    aws_access_key_id=get_param("AWS_ACCESS_KEY_ID"),
-    aws_secret_access_key=get_param("AWS_SECRET_ACCESS_KEY"),
-    region_name=get_param("AWS_REGION")
-)
-
-# 이후 기존 코드 유지...
+s3 = boto3.resource('s3')
+BUCKET_NAME = "musical-data"  # 버킷 이름을 문자열로 저장
+bucket = s3.Bucket(BUCKET_NAME)  # 버킷 객체 생성
 
 # S3 업로드 함수
-def upload_df_to_s3_as_json(df, bucket_name, s3_file_key):
+def upload_df_to_s3_as_json(df, bucket, s3_file_key):
     """
     DataFrame을 JSON 형식으로 변환하여 S3에 업로드
     """
@@ -27,12 +31,12 @@ def upload_df_to_s3_as_json(df, bucket_name, s3_file_key):
         # S3 폴더 확인 및 생성
         s3_folder = "/".join(s3_file_key.split("/")[:-1])
         if s3_folder:
-            s3_client.put_object(Bucket=bucket_name, Key=(s3_folder + "/"))
+            bucket.put_object(Key=(s3_folder + "/"))
 
         # 모든 데이터를 JSON으로 변환
         json_data = df.to_json(orient="records", force_ascii=False, indent=4)
-        s3_client.put_object(Body=json_data, Bucket=bucket_name, Key=s3_file_key)
-        print(f"S3 업로드 성공: {bucket_name}/{s3_file_key}")
+        bucket.put_object(Body=json_data, Key=s3_file_key)
+        print(f"S3 업로드 성공: {BUCKET_NAME}/{s3_file_key}")
     except Exception as e:
         print(f"S3 업로드 실패: {e}")
 
@@ -71,9 +75,8 @@ def main(detailed_df):
     processed_df = process_data(detailed_df)
 
     # S3 업로드
-    bucket_name = os.getenv("musical-data")
     s3_file_key = "results/per+raw.json"
-    upload_df_to_s3_as_json(processed_df, bucket_name, s3_file_key)
+    upload_df_to_s3_as_json(processed_df, bucket, s3_file_key)  # bucket 객체 전달
 
     print("데이터 처리 및 업로드 완료.")
     return processed_df
