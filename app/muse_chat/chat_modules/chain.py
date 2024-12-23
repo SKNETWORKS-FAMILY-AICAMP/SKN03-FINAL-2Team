@@ -67,3 +67,20 @@ class Chain:
             | model
             | StrOutputParser()
         )
+
+    @staticmethod
+    def set_judge_chain():
+        """Judge 노드에서 사용할 체인"""
+        prompt = Prompt.get_judge_prompt()
+        model = Model.get_openai_single_model()
+
+        return (
+            RunnablePassthrough.assign(
+                query=lambda x: x["query"],
+                chat_history=lambda x: x["chat_history"],
+                documents=lambda x: x["documents"],
+            )
+            | prompt
+            | model
+            | StrOutputParser()
+        )

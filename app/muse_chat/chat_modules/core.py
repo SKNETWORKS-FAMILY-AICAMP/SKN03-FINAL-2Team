@@ -1,4 +1,3 @@
-import streamlit as st
 from muse_chat.chat_modules.base import Base
 from muse_chat.chat_modules.chain import Chain
 from muse_chat.chat_modules.model import Model
@@ -192,11 +191,6 @@ class PopularityRerankerNode(Base):
 
     def process(self, state: GraphState) -> GraphState:
         try:
-
-            # 문서가 없는 경우 처리
-            if not state.get("aggregated_documents"):
-                return {"response": "죄송합니다. 추천할 만한 전시회를 찾지 못했습니다."}
-
             # 인기도(E_ticketcast) 기준으로 정렬
             sorted_docs = sorted(
                 state["aggregated_documents"],
@@ -224,23 +218,6 @@ class PopularityRerankerNode(Base):
             return {"response": "전시회 정보를 처리하는 중 오류가 발생했습니다."}
 
 
-class HumanNode(Base):
-    """사용자 응답을 처리하는 노드"""
-
-    def __init__(self, **kwargs):
-        super().__init__(**kwargs)
-        self.name = "HumanNode"
-
-    def process(self, state: GraphState) -> GraphState:
-        # 상태에서 사용자 응답 확인
-        user_response = state.get("user_response", "revise")
-
-        return {
-            "human_answer": user_response,
-            "answer_type": "accept" if user_response == "accept" else "revise",
-        }
-
-
 class ReWriterNode(Base):
     """문서를 재작성하는 노드"""
 
@@ -255,3 +232,23 @@ class ReWriterNode(Base):
             {"query": state["query"], "hypothetical_doc": state["hypothetical_doc"]}
         )
         return {"query": rewritten_query}
+
+
+class JudgeNode(Base):
+    """사용자 쿼리를 평가하고 Rerank 시키는 노드"""
+
+    def __init__(self, **kwargs):
+        super().__init__(**kwargs)
+        self.name = "JudgeNode"
+
+    def process(self, state: GraphState) -> GraphState:
+        # 쿼리 평가 로직 구현
+        chain = Chain.set_judge_chain()
+        response = chain.invoke(
+            {
+                "query": state["query"],
+                "chat_history": state["chat_history"],
+                "documents": state["documents"],
+            },
+        )
+        return {"response": response}

@@ -15,4 +15,4 @@ class GraphState(TypedDict):
     popularity_ranked_documents: list
     human_answer: str | None
     answer_type: str
-    response: Annotated[str, add_messages]
+    response: str
