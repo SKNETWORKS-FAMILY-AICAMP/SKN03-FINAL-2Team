@@ -3,7 +3,7 @@ import easyocr
 import logging
 import re
 import warnings
-from utils.paramstore import ParameterStore
+from ..utils.paramstore import ParameterStore
 
 warnings.filterwarnings(action='ignore')
 

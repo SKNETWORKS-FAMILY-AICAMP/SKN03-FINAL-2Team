@@ -2,7 +2,7 @@ from langchain_upstage import UpstageEmbeddings
 import numpy as np
 import json
 import logging
-from utils.paramstore import ParameterStore
+from ..utils.paramstore import ParameterStore
 
 class TextEmbedding:
     def __init__(self):

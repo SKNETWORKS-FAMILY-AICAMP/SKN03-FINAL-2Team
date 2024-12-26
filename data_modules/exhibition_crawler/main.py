@@ -1,9 +1,9 @@
-from exhibition_crawler.collectors.chrome_driver import DriverManager
-from exhibition_crawler.collectors.exhibition_collector import ExhibitionDataCollector
-from exhibition_crawler.processors.image_processor import ImageProcessor
-from exhibition_crawler.processors.data_processor import OCRProcessor, PromptProcessor
-from exhibition_crawler.processors.embedding import TextEmbedding
-from exhibition_crawler.utils.mongoDB import MongoDBManager
+from .collectors.chrome_driver import DriverManager
+from .collectors.exhibition_collector import ExhibitionDataCollector
+from .processors.image_processor import ImageProcessor
+from .processors.data_processor import OCRProcessor, PromptProcessor
+from .processors.embedding import TextEmbedding
+from .utils.mongoDB import MongoDBManager
 import logging
 import time
 from selenium.webdriver.common.by import By
