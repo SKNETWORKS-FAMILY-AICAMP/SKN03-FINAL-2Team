@@ -14,3 +14,6 @@ result/
 csv_result/
 dockerfile
 .dockerignore
+data_modules/exhibition_crawler/
+monitoring_backup/
+temp_docker_test/
