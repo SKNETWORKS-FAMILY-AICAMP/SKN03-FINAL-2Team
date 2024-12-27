@@ -59,7 +59,7 @@ if "last_genre" not in st.session_state:
     st.session_state.last_genre = None
 if "recommendations" not in st.session_state:
     st.session_state["recommendations"] = None
-if "active_titles" not in st.session_state:  # 현재 상영 중인 타이틀 저장
+if "active_titles" not in st.session_state:
     st.session_state["active_titles"] = []
 
 # Streamlit 사이드바 설정
@@ -208,31 +208,43 @@ if current_session:
                         st.session_state.active_titles = active_titles
                         st.markdown("현재 상영 중인 추천 뮤지컬 목록:\n")
                         recommendation_message = ""
+                        recommendation_img = ""
                         for _, row in matched_recommendations.iterrows():
-                            st.image(row['poster'], caption=row['title'], use_container_width=True)
-                            markdown_message = (
-                                f"- **{row['title']}**\n"
-                                f"  - 장소: {row['place']}\n"
-                                f"  - 배우: {row['cast']}\n"
-                                f"  - 장르: {row['genre']}\n"
-                                f"  - 종료일: {row['end_date']}\n"
-                                f"  - 시간: {row['time']}\n"
-                                f"  - 가격: {row['ticket_price']}\n\n"
-                            )
-                            st.markdown(markdown_message)
-                            recommendation_message += markdown_message
+                            col1, col2 = st.columns([1, 3])
+                            with col1:
+                                st.image(row['poster'], width=100, caption=row['title'])
+                            with col2:    
+                                markdown_message = (
+                                    f"- **{row['title']}**\n"
+                                    f"  - 장소: {row['place']}\n"
+                                    f"  - 배우: {row['cast']}\n"
+                                    f"  - 장르: {row['genre']}\n"
+                                    f"  - 종료일: {row['end_date']}\n"
+                                    f"  - 시간: {row['time']}\n"
+                                    f"  - 가격: {row['ticket_price']}\n\n"
+                                )
+                                st.markdown(
+                                    f"- **{row['title']}**\n"
+                                    f"  - 장소: {row['place']}\n"
+                                    f"  - 배우: {row['cast']}\n"
+                                    f"  - 장르: {row['genre']}\n"
+                                    f"  - 종료일: {row['end_date']}\n"
+                                    f"  - 시간: {row['time']}\n"
+                                    f"  - 가격: {row['ticket_price']}\n\n"
+                                )
+                                recommendation_message += markdown_message
 
                         # Assistant Message 출력 및 chat_history에 저장
-                        with st.chat_message("assistant"):
-                            st.markdown(recommendation_message)
+                        # with st.chat_message("assistant"):
+                        #     st.markdown(recommendation_message)
 
-                            assistant_message = {
-                                "role": "assistant",
-                                "content": recommendation_message,
-                                "timestamp": datetime.now(),
-                            }
-                            st.session_state.chat_history.append(assistant_message)
-                            current_session["messages"].append(assistant_message)
+                        assistant_message = {
+                            "role": "assistant",
+                            "content": recommendation_message,
+                            "timestamp": datetime.now(),
+                        }
+                        st.session_state.chat_history.append(assistant_message)
+                        current_session["messages"].append(assistant_message)
                         st.markdown("예매 링크를 안내해드릴까요?")
             
             elif booking_condition:
@@ -250,17 +262,17 @@ if current_session:
                         else:
                             st.markdown(f"- **{title}**: 예매 링크를 찾을 수 없습니다.")
 
-                                            # Assistant Message 출력 및 chat_history에 저장
+                    # Assistant Message 출력 및 chat_history에 저장
                     with st.chat_message("assistant"):
                         st.markdown(booking_message)
 
-                        assistant_message = {
-                            "role": "assistant",
-                            "content": markdown_booking,
-                            "timestamp": datetime.now(),
-                        }
-                        st.session_state.chat_history.append(assistant_message)
-                        current_session["messages"].append(assistant_message)
+                    assistant_message = {
+                        "role": "assistant",
+                        "content": markdown_booking,
+                        "timestamp": datetime.now(),
+                    }
+                    st.session_state.chat_history.append(assistant_message)
+                    current_session["messages"].append(assistant_message)
             else:
                 # 모델 추천 실행
                 recommendations = recommender.recommend(extracted_actor,extracted_genre)
@@ -269,29 +281,31 @@ if current_session:
                 # if not filter_condition:
                 st.session_state["recommendations"] = recommendations
                 recommendation_message = ""
-
+                recommendation_img = ""
                 for idx, (_, row) in enumerate(recommendations.iterrows()):
                         if idx < 3:
-                            st.image(row['poster'], caption=row['title'], use_container_width=True)
-                            st.markdown(
-                                    f"- **{row['title']}**\n"
-                                    f"  - 장소: {row['place']}\n"
-                                    f"  - 배우: {row['cast']}\n"
-                                    f"  - 장르: {row['genre']}\n"
-                                    f"  - 가격: {row['ticket_price']}\n"
-                            )
+                            col1, col2 = st.columns([1, 3])
+                            with col1:
+                                st.image(row['poster'], width=100, caption=row['title'])
+                            with col2:
+                                recommendation_message += (
+                                    f"**{row['title']}**\n"
+                                    f"- 장소: {row['place']}\n"
+                                    f"- 배우: {row['cast']}\n"
+                                    f"- 가격: {row['ticket_price']}\n\n"
+                                ) 
+                                st.markdown(
+                                    f"**{row['title']}**\n"
+                                    f"- 장소: {row['place']}\n"
+                                    f"- 배우: {row['cast']}\n"
+                                    f"- 가격: {row['ticket_price']}\n\n"
+                                )
                         else:
-                            recommendation_message += (
-                                f"- **{row['title']}**\n"
-                                f"  - 장소: {row['place']}\n"
-                                f"  - 배우: {row['cast']}\n"
-                                f"  - 장르: {row['genre']}\n"
-                                f"  - 가격: {row['ticket_price']}\n"
-                            )
+                            pass
                     
-                # 추천 결과 출력
-                with st.chat_message("assistant"):
-                    st.markdown(recommendation_message)
+                # # 추천 결과 출력
+                # with st.chat_message("assistant"):
+                #     st.markdown(recommendation_message)
 
                 assistant_message = {
                     "role": "assistant",
@@ -315,7 +329,6 @@ if current_session:
                 current_session["messages"].append(follow_up_message_data)
 
         except Exception as e:
-            # 오류 처리
             error_message = f"오류가 발생했습니다: 다시 입력해주세요"
             with st.chat_message("assistant"):
                 st.markdown(error_message)
