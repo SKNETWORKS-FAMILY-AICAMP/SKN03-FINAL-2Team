@@ -101,9 +101,9 @@ def new_func(agent_input):
 # 인터파크 링크 
 def fetch_interpark_ticket_url(keyword):
     options = webdriver.ChromeOptions()
-    # options.add_argument("--headless")  # 브라우저 창 안 보이도록 설정
-    # options.add_argument("--no-sandbox")
-    # options.add_argument("--disable-dev-shm-usage")
+    options.add_argument("--headless")  # 브라우저 창 안 보이도록 설정
+    options.add_argument("--no-sandbox")
+    options.add_argument("--disable-dev-shm-usage")
     
     driver = webdriver.Chrome(service=Service(ChromeDriverManager().install()), options=options)
     base_url = f"https://tickets.interpark.com/contents/search?keyword={keyword}&start=0&rows=20"
