@@ -32,6 +32,7 @@ from selenium.webdriver.chrome.service import Service
 from selenium.webdriver import ActionChains, Keys
 from selenium.webdriver.support.ui import WebDriverWait
 from selenium.webdriver.support import expected_conditions as EC
+from selenium.webdriver.chrome.options import Options
 from webdriver_manager.chrome import ChromeDriverManager
 import time
 
@@ -100,12 +101,16 @@ def new_func(agent_input):
 
 # 인터파크 링크 
 def fetch_interpark_ticket_url(keyword):
-    options = webdriver.ChromeOptions()
-    options.add_argument("--headless")  # 브라우저 창 안 보이도록 설정
-    options.add_argument("--no-sandbox")
-    options.add_argument("--disable-dev-shm-usage")
+    chrome_options = Options()
+    chrome_options.add_argument('--headless')
+    chrome_options.add_argument('--no-sandbox')
+    chrome_options.add_argument('--disable-dev-shm-usage')
+    chrome_options.add_argument('--disable-gpu')
+    chrome_options.add_argument('--window-size=1920x1080')
+    chrome_options.add_argument('--user-agent=Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36')
+    chrome_options.add_argument('--disable-blink-features=AutomationControlled')
     
-    driver = webdriver.Chrome(service=Service(ChromeDriverManager().install()), options=options)
+    driver = webdriver.Chrome(options=chrome_options)
     base_url = f"https://tickets.interpark.com/contents/search?keyword={keyword}&start=0&rows=20"
 
     try:
