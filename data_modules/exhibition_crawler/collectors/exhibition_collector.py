@@ -245,20 +245,17 @@ class ExhibitionDataCollector:
     def format_data(self):
         formatted_data = []
         for exhibition in self.exhibition_data:
-            price_list = []
+            price_dict = {}
             if exhibition["details"].get("가격"):
                 for price_item in exhibition["details"]["가격"]:
-                    price_dict = {
-                        "type": price_item["name"],
-                        "price": int(''.join(filter(str.isdigit, price_item["price"])))
-                    }
-                    price_list.append(price_dict)
+                    price_value = int(''.join(filter(str.isdigit, price_item["price"])))
+                    price_dict[price_item["name"]] = f"{price_value:,}원"
 
             formatted_exhibition = {
                 "E_title": exhibition["name"],
                 "E_context": exhibition["details"]["상세정보"].get("text", ""),
                 "E_poster": exhibition.get("poster_url", ""),
-                "E_price": price_list,
+                "E_price": price_dict,
                 "E_place": exhibition["details"].get("장소", "").replace("(자세히)", "").strip(),
                 "E_date": exhibition["details"].get("기간", ""),
                 "E_link": exhibition.get("detail_url", ""),
