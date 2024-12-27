@@ -110,20 +110,20 @@ def fetch_interpark_ticket_url(keyword):
     chrome_options.add_argument('--disable-blink-features=AutomationControlled')
     
     try:
-        # AWS Linux 환경에서는 chromedriver 경로를 명시적으로 지정
-        chromedriver_path = '/usr/bin/chromedriver'  # AWS Linux의 일반적인 chromedriver 경로
-        service = Service(executable_path=chromedriver_path)
+        # AWS Linux 환경을 위한 Service 객체 생성
+        service = Service()
         driver = webdriver.Chrome(service=service, options=chrome_options)
         
         base_url = f"https://tickets.interpark.com/contents/search?keyword={keyword}&start=0&rows=20"
         driver.get(base_url)
         wait = WebDriverWait(driver, 10)
         
-        # 기존 XPath 유지
+        # data-prd-no 속성을 포함한 첫 번째 링크 찾기
         element = wait.until(EC.presence_of_element_located((By.XPATH, "/html/body/div[1]/div/main/div/div/div[1]/div[2]/a")))
         data_prd_no = element.get_attribute("data-prd-no")
         
         if data_prd_no:
+            # data-prd-no를 기반으로 예매 URL 생성
             final_url = f"https://tickets.interpark.com/goods/{data_prd_no}"
             return final_url
             
