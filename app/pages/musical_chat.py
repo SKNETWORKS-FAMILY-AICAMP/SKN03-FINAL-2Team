@@ -33,7 +33,6 @@ from selenium.webdriver import ActionChains, Keys
 from selenium.webdriver.support.ui import WebDriverWait
 from selenium.webdriver.support import expected_conditions as EC
 from selenium.webdriver.chrome.options import Options
-from webdriver_manager.chrome import ChromeDriverManager
 import time
 
 tool_executor = ToolNode(tools)
@@ -110,29 +109,33 @@ def fetch_interpark_ticket_url(keyword):
     chrome_options.add_argument('--user-agent=Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36')
     chrome_options.add_argument('--disable-blink-features=AutomationControlled')
     
-    driver = webdriver.Chrome(options=chrome_options)
-    base_url = f"https://tickets.interpark.com/contents/search?keyword={keyword}&start=0&rows=20"
-
     try:
+        # AWS Linux 환경을 위한 Service 객체 생성
+        service = Service()
+        driver = webdriver.Chrome(service=service, options=chrome_options)
+        
+        base_url = f"https://tickets.interpark.com/contents/search?keyword={keyword}&start=0&rows=20"
         driver.get(base_url)
         wait = WebDriverWait(driver, 10)
         
         # data-prd-no 속성을 포함한 첫 번째 링크 찾기
         element = wait.until(EC.presence_of_element_located((By.XPATH, "/html/body/div[1]/div/main/div/div/div[1]/div[2]/a")))
         data_prd_no = element.get_attribute("data-prd-no")
-
+        
         if data_prd_no:
             # data-prd-no를 기반으로 예매 URL 생성
             final_url = f"https://tickets.interpark.com/goods/{data_prd_no}"
             return final_url
-        else:
-            return None
-
+            
     except Exception as e:
-        print(f"Error fetching Interpark ticket URL: {e}")
+        print(f"Error in fetch_interpark_ticket_url: {e}")
         return None
+        
     finally:
-        driver.quit()
+        try:
+            driver.quit()
+        except:
+            pass
 
 
 if current_session:
@@ -201,7 +204,7 @@ if current_session:
                         with st.chat_message("assistant"):
                             message = "추천 조건에 맞는 뮤지컬 정보를 찾을 수 없습니다."
                     else:
-                        # 상영 중인 뮤지컬 타이틀 저장
+                        # 상영 중인 뮤지컬 타��틀 저장
                         active_titles = matched_recommendations['title'].tolist()
                         st.session_state.active_titles = active_titles
                         st.markdown("현재 상영 중인 추천 뮤지컬 목록:\n")
