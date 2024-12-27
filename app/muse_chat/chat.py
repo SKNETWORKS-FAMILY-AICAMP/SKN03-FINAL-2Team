@@ -3,7 +3,9 @@ from langgraph.graph import END, START, StateGraph
 from muse_chat.chat_modules.condition import CheckAnswer, CheckSimilarity, Supervisor
 from muse_chat.chat_modules.core import (
     EmbedderNode,
+    HighSimilarityGeneratorNode,
     JudgeNode,
+    LowSimilarityGeneratorNode,
     MongoAggregationNode,
     MongoRetrieverNode,
     Multi2HyDENode,
@@ -11,6 +13,7 @@ from muse_chat.chat_modules.core import (
     ReWriterNode,
     SimilarityRerankerNode,
     Single2HyDENode,
+    SupervisorNode,
 )
 from muse_chat.chat_modules.state import GraphState
 from shared.mongo_base import MongoBase
@@ -38,19 +41,26 @@ class MuseChatGraph:
             "aggregation",
             MongoAggregationNode(collection=self.db_collection),
         )
+        sub_graph.add_node("high_similarity_generator", HighSimilarityGeneratorNode())
+        sub_graph.add_node("low_similarity_generator", LowSimilarityGeneratorNode())
 
+        sub_graph.add_edge(START, "embedder")
         sub_graph.add_edge("embedder", "retriever")
         sub_graph.add_edge("retriever", "similarity_reranker")
         sub_graph.add_edge("similarity_reranker", "aggregation")
+        sub_graph.add_edge("aggregation", "popularity_reranker")
+
         sub_graph.add_conditional_edges(
-            "aggregation",
+            "popularity_reranker",
             CheckSimilarity(),
             {
-                "high_similarity": "popularity_reranker",
-                "low_similarity": END,
+                "high_similarity": "high_similarity_generator",
+                "low_similarity": "low_similarity_generator",
             },
         )
-        sub_graph.add_edge("popularity_reranker", END)
+        sub_graph.add_edge("high_similarity_generator", END)
+        sub_graph.add_edge("low_similarity_generator", END)
+
         return sub_graph.compile()
 
     def build_main_graph(self) -> StateGraph:
@@ -63,17 +73,19 @@ class MuseChatGraph:
         main_graph.add_node("multi2hyde", Multi2HyDENode())
         main_graph.add_node("sub_graph", self.sub_graph)
         main_graph.add_node("judge", JudgeNode())
+        main_graph.add_node("supervisor", SupervisorNode())
+
         main_graph.add_edge(START, "judge")
         main_graph.add_conditional_edges(
             "judge",
             CheckAnswer(),
             {
                 "yes": END,
-                "no": "multi2hyde",
+                "no": "supervisor",
             },
         )
         main_graph.add_conditional_edges(
-            START,
+            "supervisor",
             Supervisor(),
             {
                 "single_modal_input": "single2hyde",
@@ -101,39 +113,36 @@ class MuseChatGraph:
 def process_query(
     graph: StateGraph,
     query: str,
-    images: list = None,
+    image: str = None,
     chat_history: list = None,
-    documents: list = None,
+    last_documents: list = None,
 ):
-    """
-    쿼리를 처리하고 응답을 반환
-    """
-    print("\n=== Process Query Start ===")
-    print(f"Query: {query}")
-    print(f"Images: {images[0]}")
-
     initial_state = {
         "query": query,
-        "images": images or [],
+        "image": image or "",
         "chat_history": chat_history or [],
-        "documents": documents or [],
+        "documents": last_documents or [],
     }
-    print(f"Initial State: {initial_state}")
 
-    # 일반 실행 모드 사용
-    try:
-        final_state = graph.invoke(initial_state)
-        print(f"Final state: {final_state}")
+    # LangGraph의 메시지 스트리밍 모드 사용
+    for message, metadata in graph.stream(initial_state, stream_mode="messages"):
+        # aggregation 노드의 결과 캡처
+        if metadata["langgraph_node"] == "aggregation":
+            if (
+                isinstance(message.content, dict)
+                and "aggregated_documents" in message.content
+            ):
+                yield {
+                    "type": "memory_update",
+                    "documents": message.content["aggregated_documents"],
+                }
+                continue
 
-        if isinstance(final_state, dict) and "response" in final_state:
-            response = final_state["response"]
-            print(f"Found response in final state: {response[:100]}...")
-            yield response
-        else:
-            print(f"Unexpected final state type: {type(final_state)}")
-            yield "응답을 처리하는 중 오류가 발생했습니다."
-    except Exception as e:
-        print(f"Error in process_query: {e}")
-        yield "응답을 처리하는 중 오류가 발생했습니다."
-
-    print("=== Process Query End ===\n")
+        # generator 노드의 응답만 스트리밍
+        if (
+            metadata["langgraph_node"] == "high_similarity_generator"
+            or metadata["langgraph_node"] == "low_similarity_generator"
+            or (metadata["langgraph_node"] == "judge" and message.content != "No")
+        ):
+            if isinstance(message.content, str):
+                yield message.content

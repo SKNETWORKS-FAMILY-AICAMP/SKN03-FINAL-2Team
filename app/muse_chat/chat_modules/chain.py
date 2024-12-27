@@ -34,10 +34,10 @@ class Chain:
                     HumanMessage(
                         content=[
                             {"type": "text", "text": input_dict["prompt_text"]},
-                            *[
-                                {"type": "image_url", "image_url": {"url": img}}
-                                for img in input_dict["images"]
-                            ],
+                            {
+                                "type": "image_url",
+                                "image_url": {"url": input_dict["image"]},
+                            },
                         ]
                     )
                 ]
@@ -45,7 +45,7 @@ class Chain:
             return (
                 RunnablePassthrough.assign(
                     prompt_text=lambda x: prompt.format(query=x["query"]),
-                    images=itemgetter("images"),
+                    image=itemgetter("image"),
                 )
                 | create_messages
                 | model
@@ -72,13 +72,62 @@ class Chain:
     def set_judge_chain():
         """Judge 노드에서 사용할 체인"""
         prompt = Prompt.get_judge_prompt()
-        model = Model.get_openai_single_model()
+        model = Model.get_openai_multi_model(temperature=0.45)
 
         return (
             RunnablePassthrough.assign(
                 query=lambda x: x["query"],
                 chat_history=lambda x: x["chat_history"],
                 documents=lambda x: x["documents"],
+            )
+            | prompt
+            | model
+            | StrOutputParser()
+        )
+
+    @staticmethod
+    def set_history_title_chain():
+        """Judge 노드에서 사용할 체인"""
+        prompt = Prompt.get_history_title_prompt()
+        model = Model.get_openai_single_model(temperature=0.6)
+
+        return (
+            RunnablePassthrough.assign(
+                element=lambda x: x["element"],
+            )
+            | prompt
+            | model
+            | StrOutputParser()
+        )
+
+    @staticmethod
+    def set_high_similarity_generator_chain():
+        """High Similarity Generator 노드에서 사용할 체인"""
+        prompt = Prompt.get_high_similarity_generator_prompt()
+        model = Model.get_openai_single_model(temperature=0.7)
+
+        return (
+            RunnablePassthrough.assign(
+                query=lambda x: x["query"],
+                ranked_exhibitions=lambda x: x["ranked_exhibitions"],
+                scoring_info=lambda x: x["scoring_info"],
+            )
+            | prompt
+            | model
+            | StrOutputParser()
+        )
+
+    @staticmethod
+    def set_low_similarity_generator_chain():
+        """Low Similarity Generator 노드에서 사용할 체인"""
+        prompt = Prompt.get_low_similarity_generator_prompt()
+        model = Model.get_openai_single_model(temperature=0.7)
+
+        return (
+            RunnablePassthrough.assign(
+                query=lambda x: x["query"],
+                ranked_exhibitions=lambda x: x["ranked_exhibitions"],
+                scoring_info=lambda x: x["scoring_info"],
             )
             | prompt
             | model
