@@ -21,7 +21,7 @@ def __set_api_key():
         "UPSTAGE_API_KEY",
         "COHERE_API_KEY",
         "OPENAI_API_KEY",
-        "KAKAO_REST_API_KEY",
+        # "KAKAO_REST_API_KEY",
     ]:
         if not os.environ.get(i):
             ssm = boto3.client("ssm")

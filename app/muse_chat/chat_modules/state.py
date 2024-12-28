@@ -14,6 +14,5 @@ class GraphState(TypedDict):
     aggregated_documents: List[Dict]
     popularity_ranked_documents: List[Dict]
     scoring_info: Dict[str, Union[float, Dict]]
-    judge_answer: str
+    judge_answer: Annotated[str, add_messages]
     response: Annotated[str, add_messages]
-    response_poster: Annotated[str, add_messages]

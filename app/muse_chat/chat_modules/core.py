@@ -76,7 +76,13 @@ class MongoRetrieverNode(Base):
                     "queryVector": state["embedding"],
                     "limit": self.limit,
                 }
-            }
+            },
+            {
+                "$project": {
+                    "E_text": 1,
+                    "E_original_id": 1,
+                }
+            },
         ]
 
         documents = list(self.collection.aggregate(pipeline))
@@ -149,18 +155,8 @@ class MongoAggregationNode(Base):
         ]
 
         # MongoDB에서 문서 검색
-        aggregated_docs = list(self.collection.aggregate(pipeline))
-
-        # reranked_documents와 병합
-        merged_docs = []
-        for reranked_doc in state["reranked_documents"]:
-            for agg_doc in aggregated_docs:
-                if reranked_doc["E_original_id"] == agg_doc["_id"]:
-                    merged_doc = {**reranked_doc, **agg_doc}
-                    merged_docs.append(merged_doc)
-                    break
-
-        return {"aggregated_documents": merged_docs}
+        aggregated_documents = list(self.collection.aggregate(pipeline))
+        return {"aggregated_documents": aggregated_documents}
 
 
 class PopularityRerankerNode(Base):
@@ -315,14 +311,14 @@ class JudgeNode(Base):
     def process(self, state: GraphState) -> GraphState:
         # 쿼리 평가 로직 구현
         chain = Chain.set_judge_chain()
-        response = chain.invoke(
+        judge_answer = chain.invoke(
             {
                 "query": state["query"],
                 "chat_history": state["chat_history"],
                 "documents": state["documents"],
             },
         )
-        return {"response": response}
+        return {"judge_answer": judge_answer}
 
 
 class SupervisorNode(Base):

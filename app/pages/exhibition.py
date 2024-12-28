@@ -1,30 +1,13 @@
 import base64
 import os
+import time
 from datetime import datetime
 
-# import boto3
 import streamlit as st
 
 from muse_chat.chat import MuseChatGraph, process_query
 from muse_chat.chat_modules.tool import Tool
 from shared.mongo_base import MongoBase
-
-# @st.cache_data  # 데이터를 caching 처리
-# def __set_api_key():
-#     for i in [
-#         "MONGO_URI",
-#         "MONGO_DB_NAME",
-#         "MONGO_VECTOR_DB_NAME",
-#         "UPSTAGE_API_KEY",
-#         "COHERE_API_KEY",
-#         "OPENAI_API_KEY",
-#     ]:
-#         if not os.environ.get(i):
-#             ssm = boto3.client("ssm")
-#             parameter = ssm.get_parameter(
-#                 Name=f"/DEV/CICD/MUSEIFY/{i}", WithDecryption=True
-#             )
-#             os.environ[i] = parameter["Parameter"]["Value"]
 
 
 @st.cache_resource
@@ -185,8 +168,13 @@ def encode_image_to_base64(upload_image):
     return f"data:image/{upload_image.type.split('/')[-1]};base64,{base64_image}"
 
 
+def get_stream(response):
+    for char in response.split(" "):
+        yield char + " "
+        time.sleep(0.03)
+
+
 def main():
-    st.markdown(get_style(), unsafe_allow_html=True)
 
     chat_history_db = get_chat_history_db()
     main_graph, rewrite_graph = get_graph()
@@ -222,20 +210,22 @@ def main():
 
         # 어시스턴트 응답 처리
         with st.chat_message("assistant", avatar="assistant"):
-            for result in process_query(
-                main_graph,
-                query,
-                image_data,
-                last_documents=st.session_state.current_chat["last_documents"],
-                chat_history=st.session_state.current_chat["messages"],
-            ):
-                if result["type"] == "memory_update":
-                    # last_documents를 새로운 문서들로 완전히 교체
-                    st.session_state.current_chat["last_documents"] = result[
-                        "documents"
-                    ]
-                else:
-                    response = st.write_stream(result)
+            with st.spinner("답변 생성 중..."):
+                response_generator = process_query(
+                    main_graph,
+                    query,
+                    image_data,
+                    last_documents=st.session_state.current_chat["last_documents"],
+                    chat_history=st.session_state.current_chat["messages"],
+                )
+                for result in response_generator:
+                    if "aggregated_documents" in result:
+                        print(result["aggregated_documents"])
+                        st.session_state.current_chat["last_documents"] = result[
+                            "aggregated_documents"
+                        ]
+                    else:
+                        response = st.write_stream(get_stream(result))
 
         st.session_state.current_chat["messages"].extend(
             [
@@ -251,7 +241,9 @@ def main():
 
 
 if __name__ == "__main__":
+    st.markdown(get_style(), unsafe_allow_html=True)
     st.title("💬 Muse Chat")
     st.caption("사용자 관심사 기반 전시회 추천 가이드")
+
     connect_db()
     main()

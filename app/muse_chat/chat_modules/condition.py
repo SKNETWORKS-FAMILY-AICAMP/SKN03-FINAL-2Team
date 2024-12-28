@@ -14,7 +14,7 @@ class Supervisor(Base):
 
 
 class CheckSimilarity(Base):
-    def __init__(self, threshold=0.7, **kwargs):
+    def __init__(self, threshold=0.9, **kwargs):
         super().__init__(**kwargs)
         self.name = "CheckSimilarity"
         self.threshold = threshold
@@ -42,7 +42,8 @@ class CheckAnswer(Base):
         self.name = "CheckAnswer"
 
     def process(self, state: GraphState) -> str:
-        judge_answer = state.get("judge_answer", "No")
+        judge_answer = state["judge_answer"][-1].content
+        print(f"CheckAnswer - Judge Answer: {judge_answer}")
         if judge_answer == "No":
             return "no"
         return "yes"

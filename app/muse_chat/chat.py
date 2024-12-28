@@ -1,3 +1,5 @@
+import time
+
 from langgraph.graph import END, START, StateGraph
 
 from muse_chat.chat_modules.condition import CheckAnswer, CheckSimilarity, Supervisor
@@ -125,24 +127,21 @@ def process_query(
     }
 
     # LangGraph의 메시지 스트리밍 모드 사용
-    for message, metadata in graph.stream(initial_state, stream_mode="messages"):
-        # aggregation 노드의 결과 캡처
-        if metadata["langgraph_node"] == "aggregation":
-            if (
-                isinstance(message.content, dict)
-                and "aggregated_documents" in message.content
-            ):
-                yield {
-                    "type": "memory_update",
-                    "documents": message.content["aggregated_documents"],
-                }
+    for namespace, chunk in graph.stream(
+        initial_state, stream_mode="updates", subgraphs=True
+    ):
+        for node, value in chunk.items():
+            # aggregation 노드의 결과 캡처
+            if node == "aggregation":
+                if isinstance(value, dict) and "aggregated_documents" in value:
+                    yield {"aggregated_documents": value["aggregated_documents"]}
                 continue
 
-        # generator 노드의 응답만 스트리밍
-        if (
-            metadata["langgraph_node"] == "high_similarity_generator"
-            or metadata["langgraph_node"] == "low_similarity_generator"
-            or (metadata["langgraph_node"] == "judge" and message.content != "No")
-        ):
-            if isinstance(message.content, str):
-                yield message.content
+            # judge 노드의 응답 스트리밍
+            if node == "judge" and value["judge_answer"] != "No":
+                yield value["judge_answer"]
+                continue
+
+            # generator 노드의 응답 스트리밍
+            if node in ["high_similarity_generator", "low_similarity_generator"]:
+                yield value["response"]

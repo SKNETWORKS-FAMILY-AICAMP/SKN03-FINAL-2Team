@@ -104,7 +104,7 @@ class Chain:
     def set_high_similarity_generator_chain():
         """High Similarity Generator 노드에서 사용할 체인"""
         prompt = Prompt.get_high_similarity_generator_prompt()
-        model = Model.get_openai_single_model(temperature=0.7)
+        model = Model.get_openai_single_model(temperature=0.2)
 
         return (
             RunnablePassthrough.assign(
@@ -121,7 +121,7 @@ class Chain:
     def set_low_similarity_generator_chain():
         """Low Similarity Generator 노드에서 사용할 체인"""
         prompt = Prompt.get_low_similarity_generator_prompt()
-        model = Model.get_openai_single_model(temperature=0.7)
+        model = Model.get_openai_single_model(temperature=0.2)
 
         return (
             RunnablePassthrough.assign(
