@@ -16,6 +16,7 @@ sys.path.append(main_dir)
 # utils 디렉토리 경로 추가
 utils_dir = os.path.abspath(os.path.join(current_dir, "../utils"))
 sys.path.append(utils_dir)
+
 import config
 from utils.recommend import Recommender
 from components.tool_module import tools
@@ -31,7 +32,7 @@ from selenium.webdriver.chrome.service import Service
 from selenium.webdriver import ActionChains, Keys
 from selenium.webdriver.support.ui import WebDriverWait
 from selenium.webdriver.support import expected_conditions as EC
-from webdriver_manager.chrome import ChromeDriverManager
+from selenium.webdriver.chrome.options import Options
 import time
 
 tool_executor = ToolNode(tools)
@@ -59,8 +60,10 @@ if "last_genre" not in st.session_state:
     st.session_state.last_genre = None
 if "recommendations" not in st.session_state:
     st.session_state["recommendations"] = None
-if "active_titles" not in st.session_state:  # 현재 상영 중인 타이틀 저장
+if "active_titles" not in st.session_state:
     st.session_state["active_titles"] = []
+if "recommend_images" not in st.session_state:
+    st.session_state["recommend_imgaes"] = []
 
 # Streamlit 사이드바 설정
 st.sidebar.title("뮤지컬 추천 가이드")
@@ -81,17 +84,14 @@ if st.sidebar.button("새 채팅방 시작"):
     st.session_state.current_session_id = new_session_id
     st.session_state.chat_history = []
 
-# 현재 선택된 채팅방 가져오기
 current_session = st.session_state.chat_sessions.get(st.session_state.current_session_id)
 
 # 메인 화면 설정
 st.title("뮤지컬 챗봇")
 st.markdown("좋아하는 배우를 입력해주세요")
-# config.py에서 unique_genres 가져오기
 st.markdown("### 사용 가능한 장르 목록")
 st.markdown(", ".join(config.unique_genres))
 
-# 채팅방이 선택된 경우
 def new_func(agent_input):
     agent_response = run_agent(agent_input)
     extracted_actor = agent_response.get("actor", None)
@@ -100,40 +100,47 @@ def new_func(agent_input):
 
 # 인터파크 링크 
 def fetch_interpark_ticket_url(keyword):
-    options = webdriver.ChromeOptions()
-    options.add_argument("--headless")  # 브라우저 창 안 보이도록 설정
-    options.add_argument("--no-sandbox")
-    options.add_argument("--disable-dev-shm-usage")
+    chrome_options = Options()
+    chrome_options.add_argument('--headless')
+    chrome_options.add_argument('--no-sandbox')
+    chrome_options.add_argument('--disable-dev-shm-usage')
+    chrome_options.add_argument('--disable-gpu')
+    chrome_options.add_argument('--window-size=1920x1080')
+    chrome_options.add_argument('--user-agent=Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36')
+    chrome_options.add_argument('--disable-blink-features=AutomationControlled')
     
-    driver = webdriver.Chrome(service=Service(ChromeDriverManager().install()), options=options)
-    base_url = f"https://tickets.interpark.com/contents/search?keyword={keyword}&start=0&rows=20"
-
     try:
+        # AWS Linux 환경을 위한 Service 객체 생성
+        service = Service()
+        driver = webdriver.Chrome(service=service, options=chrome_options)
+        
+        base_url = f"https://tickets.interpark.com/contents/search?keyword={keyword}&start=0&rows=20"
         driver.get(base_url)
         wait = WebDriverWait(driver, 10)
         
         # data-prd-no 속성을 포함한 첫 번째 링크 찾기
         element = wait.until(EC.presence_of_element_located((By.XPATH, "/html/body/div[1]/div/main/div/div/div[1]/div[2]/a")))
-        data_prd_no = element.get_attribute("data-prd-no")  # data-prd-no 값을 추출
-
+        data_prd_no = element.get_attribute("data-prd-no")
+        
         if data_prd_no:
             # data-prd-no를 기반으로 예매 URL 생성
             final_url = f"https://tickets.interpark.com/goods/{data_prd_no}"
             return final_url
-        else:
-            return None
-
+            
     except Exception as e:
-        print(f"Error fetching Interpark ticket URL: {e}")
+        print(f"Error in fetch_interpark_ticket_url: {e}")
         return None
+        
     finally:
-        driver.quit()
+        try:
+            driver.quit()
+        except:
+            pass
 
 
 if current_session:
     st.write(f"**{current_session['title']}**")
 
-    # 기존 채팅 내역 출력
     for message in st.session_state.chat_history:
         with st.chat_message(message["role"]):
             st.markdown(message["content"])
@@ -142,7 +149,6 @@ if current_session:
     prompt = st.chat_input("질문을 입력해주세요:")
 
     if prompt:
-        # 사용자 입력 메시지 추가
         user_message = {"role": "user", 
                         "content": prompt, 
                         "timestamp": datetime.now()}
@@ -154,7 +160,6 @@ if current_session:
             st.markdown(prompt)
 
         try:
-            # LLM 에이전트 처리
             agent_input = {
                 "input": prompt,
                 "chat_history": st.session_state.chat_history,
@@ -177,23 +182,19 @@ if current_session:
             if extracted_genre:
                 st.session_state.last_genre = extracted_genre
 
-            # 이전 대화 정보를 유지하여 추천
             actor = st.session_state.last_actor
             genre = st.session_state.last_genre
 
             # end_date 필터링
             if filter_condition:
-                # 현재 상영 중인 데이터 기반 점수 계산
                 top_titles = recommender.score(actor, genre)
 
                 if not top_titles:
                     st.markdown("현재 상영 중인 조건에 맞는 뮤지컬이 없습니다.")
 
                 else:
-                    # 현재 날짜 가져오기
-                    current_date = datetime.now().strftime('%Y.%m.%d')
 
-                    # title 매칭 + end_date가 현재 날짜 이후인 데이터 필터링
+                    current_date = datetime.now().strftime('%Y.%m.%d')
                     matched_recommendations = add_genre_data[
                         (add_genre_data['title'].isin(top_titles)) &
                         (add_genre_data['end_date'] > current_date)
@@ -203,36 +204,44 @@ if current_session:
                         with st.chat_message("assistant"):
                             message = "추천 조건에 맞는 뮤지컬 정보를 찾을 수 없습니다."
                     else:
-                        # 상영 중인 뮤지컬 타이틀 저장
+                        # 상영 중인 뮤지컬 타��틀 저장
                         active_titles = matched_recommendations['title'].tolist()
                         st.session_state.active_titles = active_titles
                         st.markdown("현재 상영 중인 추천 뮤지컬 목록:\n")
                         recommendation_message = ""
+                        recommendation_img = ""
                         for _, row in matched_recommendations.iterrows():
-                            st.image(row['poster'], caption=row['title'], use_container_width=True)
-                            markdown_message = (
-                                f"- **{row['title']}**\n"
-                                f"  - 장소: {row['place']}\n"
-                                f"  - 배우: {row['cast']}\n"
-                                f"  - 장르: {row['genre']}\n"
-                                f"  - 종료일: {row['end_date']}\n"
-                                f"  - 시간: {row['time']}\n"
-                                f"  - 가격: {row['ticket_price']}\n\n"
-                            )
-                            st.markdown(markdown_message)
-                            recommendation_message += markdown_message
+                            col1, col2 = st.columns([1, 3])
+                            with col1:
+                                st.image(row['poster'], width=100, caption=row['title'])
+                            with col2:    
+                                markdown_message = (
+                                    f"- **{row['title']}**\n"
+                                    f"  - 장소: {row['place']}\n"
+                                    f"  - 배우: {row['cast']}\n"
+                                    f"  - 장르: {row['genre']}\n"
+                                    f"  - 종료일: {row['end_date']}\n"
+                                    f"  - 시간: {row['time']}\n"
+                                    f"  - 가격: {row['ticket_price']}\n\n"
+                                )
+                                st.markdown(
+                                    f"- **{row['title']}**\n"
+                                    f"  - 장소: {row['place']}\n"
+                                    f"  - 배우: {row['cast']}\n"
+                                    f"  - 장르: {row['genre']}\n"
+                                    f"  - 종료일: {row['end_date']}\n"
+                                    f"  - 시간: {row['time']}\n"
+                                    f"  - 가격: {row['ticket_price']}\n\n"
+                                )
+                                recommendation_message += markdown_message
 
-                        # Assistant Message 출력 및 chat_history에 저장
-                        with st.chat_message("assistant"):
-                            st.markdown(recommendation_message)
-
-                            assistant_message = {
-                                "role": "assistant",
-                                "content": recommendation_message,
-                                "timestamp": datetime.now(),
-                            }
-                            st.session_state.chat_history.append(assistant_message)
-                            current_session["messages"].append(assistant_message)
+                        assistant_message = {
+                            "role": "assistant",
+                            "content": recommendation_message,
+                            "timestamp": datetime.now(),
+                        }
+                        st.session_state.chat_history.append(assistant_message)
+                        current_session["messages"].append(assistant_message)
                         st.markdown("예매 링크를 안내해드릴까요?")
             
             elif booking_condition:
@@ -250,49 +259,44 @@ if current_session:
                         else:
                             st.markdown(f"- **{title}**: 예매 링크를 찾을 수 없습니다.")
 
-                                            # Assistant Message 출력 및 chat_history에 저장
                     with st.chat_message("assistant"):
                         st.markdown(booking_message)
 
-                        assistant_message = {
-                            "role": "assistant",
-                            "content": markdown_booking,
-                            "timestamp": datetime.now(),
-                        }
-                        st.session_state.chat_history.append(assistant_message)
-                        current_session["messages"].append(assistant_message)
+                    assistant_message = {
+                        "role": "assistant",
+                        "content": markdown_booking,
+                        "timestamp": datetime.now(),
+                    }
+                    st.session_state.chat_history.append(assistant_message)
+                    current_session["messages"].append(assistant_message)
             else:
                 # 모델 추천 실행
                 recommendations = recommender.recommend(extracted_actor,extracted_genre)
-                # 추천 결과를 역순으로 정렬
                 recommendations = recommendations.iloc[::-1]
-                # if not filter_condition:
                 st.session_state["recommendations"] = recommendations
                 recommendation_message = ""
-
+                recommendation_img = ""
                 for idx, (_, row) in enumerate(recommendations.iterrows()):
                         if idx < 3:
-                            st.image(row['poster'], caption=row['title'], use_container_width=True)
-                            st.markdown(
-                                    f"- **{row['title']}**\n"
-                                    f"  - 장소: {row['place']}\n"
-                                    f"  - 배우: {row['cast']}\n"
-                                    f"  - 장르: {row['genre']}\n"
-                                    f"  - 가격: {row['ticket_price']}\n"
-                            )
+                            col1, col2 = st.columns([1, 3])
+                            with col1:
+                                st.image(row['poster'], width=100, caption=row['title'])
+                            with col2:
+                                recommendation_message += (
+                                    f"**{row['title']}**\n"
+                                    f"- 장소: {row['place']}\n"
+                                    f"- 배우: {row['cast']}\n"
+                                    f"- 가격: {row['ticket_price']}\n\n"
+                                ) 
+                                st.markdown(
+                                    f"**{row['title']}**\n"
+                                    f"- 장소: {row['place']}\n"
+                                    f"- 배우: {row['cast']}\n"
+                                    f"- 가격: {row['ticket_price']}\n\n"
+                                )
                         else:
-                            recommendation_message += (
-                                f"- **{row['title']}**\n"
-                                f"  - 장소: {row['place']}\n"
-                                f"  - 배우: {row['cast']}\n"
-                                f"  - 장르: {row['genre']}\n"
-                                f"  - 가격: {row['ticket_price']}\n"
-                            )
+                            pass
                     
-                # 추천 결과 출력
-                with st.chat_message("assistant"):
-                    st.markdown(recommendation_message)
-
                 assistant_message = {
                     "role": "assistant",
                     "content": recommendation_message,
@@ -315,17 +319,25 @@ if current_session:
                 current_session["messages"].append(follow_up_message_data)
 
         except Exception as e:
-            # 오류 처리
-            error_message = f"오류가 발생했습니다: 다시 입력해주세요"
-            with st.chat_message("assistant"):
-                st.markdown(error_message)
+            if extracted_actor == "None":
+                    error_message = f"배우를 함께 입력해주세요."
+                    with st.chat_message("assistant"):
+                        st.markdown(error_message)
+            if extracted_genre == "None":
+                    error_message = f"장르를 함께 입력해주세요."
+                    with st.chat_message("assistant"):
+                        st.markdown(error_message)
 
-            error_message_data = {
-                "role": "assistant",
-                "content": error_message,
-                "timestamp": datetime.now(),
-            }
-            st.session_state.chat_history.append(error_message_data)
-            current_session["messages"].append(error_message_data)
-else:
+            else:
+                error_message = f"개발자를 갈아넣어 더 성장하겠습니다."
+                with st.chat_message("assistant"):
+                    st.markdown(error_message)
+
+                error_message_data = {
+                    "role": "assistant",
+                    "content": error_message,
+                    "timestamp": datetime.now(),
+                }
+                st.session_state.chat_history.append(error_message_data)
+                current_session["messages"].append(error_message_data)
     st.write("안녕하세요 ☺️ 뮤지컬 관람 계획 중이신가요? \n\n왼쪽에서 채팅방을 선택하거나 새로 시작하세요.")
