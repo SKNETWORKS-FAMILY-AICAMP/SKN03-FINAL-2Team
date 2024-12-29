@@ -21,6 +21,10 @@ def __set_api_key():
         "UPSTAGE_API_KEY",
         "COHERE_API_KEY",
         "OPENAI_API_KEY",
+        "LANGCHAIN_TRACING_V2",
+        "LANGCHAIN_ENDPOINT",
+        "LANGCHAIN_API_KEY",
+        "LANGCHAIN_PROJECT",
         # "KAKAO_REST_API_KEY",
     ]:
         if not os.environ.get(i):

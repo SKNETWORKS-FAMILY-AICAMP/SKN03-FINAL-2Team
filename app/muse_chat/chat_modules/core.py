@@ -89,42 +89,6 @@ class MongoRetrieverNode(Base):
         return {"documents": documents}
 
 
-class SimilarityRerankerNode(Base):
-    """문서 유사도를 기반으로 재정렬하는 노드"""
-
-    def __init__(self, **kwargs):
-        super().__init__(**kwargs)
-        self.name = "SimilarityRerankerNode"
-        self.model = Model.get_rerank_model()
-
-    def process(self, state: GraphState) -> GraphState:
-        # 문서가 없는 경우 빈 리스트 반환
-        if not state["documents"]:
-            return {"reranked_documents": []}
-
-        # 디서에서 텍스트 추출
-        doc_texts = [doc["E_text"] for doc in state["documents"]]
-
-        # 재정렬 수행
-        reranked_results = self.model.rerank(
-            documents=doc_texts, query=state["hypothetical_doc"]
-        )
-
-        # 재정렬된 문서 생성
-        reranked_documents = []
-        for result in reranked_results:
-            doc_index = result["index"] if isinstance(result, dict) else result.index
-            doc = state["documents"][doc_index].copy()
-            doc["score"] = (
-                result["relevance_score"]
-                if isinstance(result, dict)
-                else result.relevance_score
-            )
-            reranked_documents.append(doc)
-
-        return {"reranked_documents": reranked_documents}
-
-
 class MongoAggregationNode(Base):
     """문서를 집계하는 노드"""
 
@@ -135,7 +99,7 @@ class MongoAggregationNode(Base):
 
     def process(self, state: GraphState) -> GraphState:
         # reranked_documents에서 E_original_id 추출
-        original_ids = [doc["E_original_id"] for doc in state["reranked_documents"]]
+        original_ids = [doc["E_original_id"] for doc in state["documents"]]
 
         # MongoDB 파이프라인 구성
         pipeline = [
@@ -157,6 +121,42 @@ class MongoAggregationNode(Base):
         # MongoDB에서 문서 검색
         aggregated_documents = list(self.collection.aggregate(pipeline))
         return {"aggregated_documents": aggregated_documents}
+
+
+class SimilarityRerankerNode(Base):
+    """문서 유사도를 기반으로 재정렬하는 노드"""
+
+    def __init__(self, **kwargs):
+        super().__init__(**kwargs)
+        self.name = "SimilarityRerankerNode"
+        self.model = Model.get_rerank_model()
+
+    def process(self, state: GraphState) -> GraphState:
+        # 문서가 없는 경우 빈 리스트 반환
+        if not state["aggregated_documents"]:
+            return {"reranked_documents": []}
+
+        # 디서에서 텍스트 추출
+        doc_texts = [doc["E_context"] for doc in state["aggregated_documents"]]
+
+        # 재정렬 수행
+        reranked_results = self.model.rerank(
+            documents=doc_texts, query=state["hypothetical_doc"]
+        )
+
+        # 재정렬된 문서 생성
+        reranked_documents = []
+        for result in reranked_results:
+            doc_index = result["index"] if isinstance(result, dict) else result.index
+            doc = state["aggregated_documents"][doc_index].copy()
+            doc["score"] = (
+                result["relevance_score"]
+                if isinstance(result, dict)
+                else result.relevance_score
+            )
+            reranked_documents.append(doc)
+
+        return {"reranked_documents": reranked_documents}
 
 
 class PopularityRerankerNode(Base):
@@ -295,10 +295,10 @@ class ReWriterNode(Base):
     def process(self, state: GraphState) -> GraphState:
         # rewrite 체인 실행
         chain = Chain.set_rewrite_chain()
-        rewritten_query = chain.invoke(
+        rewritten_doc = chain.invoke(
             {"query": state["query"], "hypothetical_doc": state["hypothetical_doc"]}
         )
-        return {"query": rewritten_query}
+        return {"hypothetical_doc": rewritten_doc}
 
 
 class JudgeNode(Base):

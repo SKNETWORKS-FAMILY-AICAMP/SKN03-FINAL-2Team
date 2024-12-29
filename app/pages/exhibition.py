@@ -35,23 +35,34 @@ def new_chat():
         "messages": [],
         "title": "New chat",
         "last_documents": [],
+        "hypothetical_doc": "",
         "updated_at": None,
         "_id": None,
     }
 
 
-def update_sidebar(mongo_client):
+def update_sidebar(mongo_client, query=None, rewrite_graph=None):
     if "chat_history" not in st.session_state:
         st.session_state.chat_history = list(mongo_client.find().sort("updated_at", -1))
     with st.sidebar:
+        # 피드백 버튼 표시
+        if st.session_state.get("show_feedback", False):
+            show_feedback_buttons(query, rewrite_graph)
+            st.markdown("---")
+
         if st.button("새 채팅", key="new_chat"):
             st.session_state.current_chat = new_chat()
+            st.session_state.show_feedback = False
+            st.rerun()
+
         st.title("Past Conversation")
         for chat in st.session_state.chat_history:
             col1, col2 = st.columns([5, 1])
             with col1:
                 if st.button(chat["title"], key=chat["_id"], type="primary"):
                     st.session_state.current_chat = chat
+                    st.session_state.show_feedback = False
+                    st.rerun()
             with col2:
                 if st.button("❌", key=f"delete_{chat["_id"]}", type="primary"):
                     mongo_client.delete_one({"_id": chat["_id"]})
@@ -92,6 +103,7 @@ def update_chat(mongo_client):
         "updated_at": st.session_state.current_chat["updated_at"],
         "messages": st.session_state.current_chat["messages"],
         "last_documents": st.session_state.current_chat["last_documents"],
+        "hypothetical_doc": st.session_state.current_chat["hypothetical_doc"],
     }
 
     mongo_client.update_one(
@@ -174,8 +186,70 @@ def get_stream(response):
         time.sleep(0.03)
 
 
-def main():
+def show_feedback_buttons(query, rewrite_graph):
+    """피드백 버튼을 표시하고 처리하는 함수"""
+    if not st.session_state.get("show_feedback", False):
+        return
 
+    st.markdown("---")
+    st.markdown("### 마지막 응답이 도움이 되셨나요?")
+
+    # 피드백 버튼을 위한 고유 키 생성
+    button_key = f"feedback_{len(st.session_state.current_chat['messages'])}"
+
+    # 버튼 상태 초기화
+    if f"{button_key}_clicked" not in st.session_state:
+        st.session_state[f"{button_key}_clicked"] = False
+
+    col1, col2 = st.columns(2)
+    with col1:
+        if not st.session_state[f"{button_key}_clicked"] and st.button(
+            "😊 만족해요!", key=f"satisfied_{button_key}"
+        ):
+            st.session_state[f"{button_key}_clicked"] = True
+            st.session_state.show_feedback = False
+            st.rerun()
+
+    with col2:
+        if not st.session_state[f"{button_key}_clicked"] and st.button(
+            "😅 다시 찾기", key=f"unsatisfied_{button_key}"
+        ):
+            st.session_state[f"{button_key}_clicked"] = True
+            st.session_state.show_feedback = False
+
+            # rewrite_graph를 사용하여 재검색
+            with st.spinner("다른 전시회를 찾아볼게요..."):
+                for result in process_query(
+                    rewrite_graph,
+                    query,
+                    hypothetical_doc=st.session_state.current_chat.get(
+                        "hypothetical_doc", ""
+                    ),
+                ):
+                    if "aggregated_documents" in result:
+                        st.session_state.current_chat["last_documents"] = result[
+                            "aggregated_documents"
+                        ]
+                    elif "hypothetical_doc" in result:
+                        st.session_state.current_chat["hypothetical_doc"] = result[
+                            "hypothetical_doc"
+                        ]
+                    else:
+                        new_response = st.write_stream(get_stream(result))
+
+                # 새로운 응답을 채팅 기록에 추가
+                st.session_state.current_chat["messages"].extend(
+                    [
+                        {
+                            "role": "user",
+                            "content": f"다른 추천 요청: {query}",
+                        },
+                        {"role": "assistant", "content": new_response},
+                    ]
+                )
+
+
+def main():
     chat_history_db = get_chat_history_db()
     main_graph, rewrite_graph = get_graph()
 
@@ -188,7 +262,17 @@ def main():
     if "current_chat" not in st.session_state:
         st.session_state.current_chat = new_chat()
 
-    update_sidebar(chat_history_db)
+    # 현재 쿼리 저장을 위한 변수
+    if (
+        "current_query" not in st.session_state
+        and st.session_state.current_chat["messages"]
+    ):
+        st.session_state.current_query = st.session_state.current_chat["messages"][-1][
+            "content"
+        ]
+    else:
+        st.session_state.current_query = None
+    update_sidebar(chat_history_db, st.session_state.current_query, rewrite_graph)
 
     # 채팅 메시지들을 표시
     for message in st.session_state.current_chat["messages"]:
@@ -198,7 +282,6 @@ def main():
 
     # 사용자 입력 처리
     if query := st.chat_input("최근 관심사를 입력해주세요 :)"):
-
         # 사용자 메시지 표시
         st.chat_message("user", avatar="user").write(query)
 
@@ -220,12 +303,17 @@ def main():
                 )
                 for result in response_generator:
                     if "aggregated_documents" in result:
-                        print(result["aggregated_documents"])
                         st.session_state.current_chat["last_documents"] = result[
                             "aggregated_documents"
                         ]
+                    elif "hypothetical_doc" in result:
+                        st.session_state.current_chat["hypothetical_doc"] = result[
+                            "hypothetical_doc"
+                        ]
                     else:
                         response = st.write_stream(get_stream(result))
+                        # 현드백 버튼 트리거 활성화
+                        st.session_state.show_feedback = True
 
         st.session_state.current_chat["messages"].extend(
             [
@@ -237,6 +325,7 @@ def main():
             update_title(chat_history_db)
 
         update_chat(chat_history_db)
+
         st.rerun()
 
 

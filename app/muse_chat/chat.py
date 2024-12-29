@@ -48,18 +48,17 @@ class MuseChatGraph:
 
         sub_graph.add_edge(START, "embedder")
         sub_graph.add_edge("embedder", "retriever")
-        sub_graph.add_edge("retriever", "similarity_reranker")
-        sub_graph.add_edge("similarity_reranker", "aggregation")
-        sub_graph.add_edge("aggregation", "popularity_reranker")
-
+        sub_graph.add_edge("retriever", "aggregation")
+        sub_graph.add_edge("aggregation", "similarity_reranker")
         sub_graph.add_conditional_edges(
-            "popularity_reranker",
+            "similarity_reranker",
             CheckSimilarity(),
             {
-                "high_similarity": "high_similarity_generator",
+                "high_similarity": "popularity_reranker",
                 "low_similarity": "low_similarity_generator",
             },
         )
+        sub_graph.add_edge("popularity_reranker", "high_similarity_generator")
         sub_graph.add_edge("high_similarity_generator", END)
         sub_graph.add_edge("low_similarity_generator", END)
 
@@ -118,12 +117,14 @@ def process_query(
     image: str = None,
     chat_history: list = None,
     last_documents: list = None,
+    hypothetical_doc: str = None,
 ):
     initial_state = {
         "query": query,
         "image": image or "",
         "chat_history": chat_history or [],
         "documents": last_documents or [],
+        "hypothetical_doc": hypothetical_doc or "",
     }
 
     # LangGraph의 메시지 스트리밍 모드 사용
@@ -140,6 +141,12 @@ def process_query(
             # judge 노드의 응답 스트리밍
             if node == "judge" and value["judge_answer"] != "No":
                 yield value["judge_answer"]
+                continue
+
+            # single2hyde 또는 multi2hyde 노드의 결과 캡처
+            if node in ["single2hyde", "multi2hyde"]:
+                if isinstance(value, dict) and "hypothetical_doc" in value:
+                    yield {"hypothetical_doc": value["hypothetical_doc"]}
                 continue
 
             # generator 노드의 응답 스트리밍
