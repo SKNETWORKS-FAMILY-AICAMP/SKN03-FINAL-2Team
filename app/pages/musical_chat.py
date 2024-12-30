@@ -204,7 +204,7 @@ if current_session:
                         with st.chat_message("assistant"):
                             message = "추천 조건에 맞는 뮤지컬 정보를 찾을 수 없습니다."
                     else:
-                        # 상영 중인 뮤지컬 타��틀 저장
+                        # 상영 중인 뮤지컬 타이틀 저장
                         active_titles = matched_recommendations['title'].tolist()
                         st.session_state.active_titles = active_titles
                         st.markdown("현재 상영 중인 추천 뮤지컬 목록:\n")

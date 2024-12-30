@@ -193,7 +193,7 @@ class Recommender:
         # 5. 상위 5개 타이틀 반환
         top_recommendations = X.sort_values(by="predicted_score", ascending=False).head(7)
         top_titles = top_recommendations['title'].map({v: k for k, v in title_encoder.items()}).tolist()
-
+        print("[DEBUG] Top 7 Recommended Titles:", top_titles)
         return top_titles
 
 
