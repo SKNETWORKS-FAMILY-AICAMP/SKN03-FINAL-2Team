@@ -107,23 +107,24 @@ def fetch_interpark_ticket_url(keyword):
     chrome_options.add_argument('--disable-gpu')
     chrome_options.add_argument('--window-size=1920x1080')
     chrome_options.add_argument('--user-agent=Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36')
-    chrome_options.add_argument('--disable-blink-features=AutomationControlled')
     
     try:
-        # AWS Linux 환경을 위한 Service 객체 생성
         service = Service()
         driver = webdriver.Chrome(service=service, options=chrome_options)
         
         base_url = f"https://tickets.interpark.com/contents/search?keyword={keyword}&start=0&rows=20"
         driver.get(base_url)
+        
+        # 페이지 로딩을 위한 짧은 대기 추가
+        time.sleep(2)
+        
         wait = WebDriverWait(driver, 10)
         
-        # data-prd-no 속성을 포함한 첫 번째 링크 찾기
-        element = wait.until(EC.presence_of_element_located((By.CSS_SELECTOR, "[data-section-order='1']")))
+        # CSS 선택자 변경 시도
+        element = wait.until(EC.presence_of_element_located((By.CSS_SELECTOR, "a[data-prd-no]")))
         data_prd_no = element.get_attribute("data-prd-no")
         
         if data_prd_no:
-            # data-prd-no를 기반으로 예매 URL 생성
             final_url = f"https://tickets.interpark.com/goods/{data_prd_no}"
             return final_url
             
@@ -251,8 +252,11 @@ if current_session:
                     st.markdown("추천된 뮤지컬이 없습니다. 먼저 추천을 받아주세요.")
                 else:
                     st.markdown("**예매 가능한 링크를 가져옵니다...**")
+                    print(f"Active titles: {active_titles}")  # 디버깅 로그
                     for title in active_titles:
+                        print(f"Processing title: {title}")  # 디버깅 로그
                         url = fetch_interpark_ticket_url(title)
+                        print(f"Returned URL for {title}: {url}")  # 디버깅 로그
                         if url:
                             markdown_booking = f"- [{title} 예매하기]({url})\n"
                             booking_message += markdown_booking
