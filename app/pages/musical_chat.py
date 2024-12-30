@@ -113,7 +113,7 @@ def fetch_interpark_ticket_url(keyword):
         wait = WebDriverWait(driver, 10)
         
         # data-prd-no 속성을 포함한 첫 번째 링크 찾기
-        element = wait.until(EC.presence_of_element_located((By.XPATH, "/html/body/div[1]/div/main/div/div/div[1]/div[2]/a")))
+        element = wait.until(EC.presence_of_element_located((By.CSS_SELECTOR, "[data-section-order='1']")))
         data_prd_no = element.get_attribute("data-prd-no")
 
         if data_prd_no:
@@ -332,4 +332,5 @@ if current_session:
                 }
                 st.session_state.chat_history.append(error_message_data)
                 current_session["messages"].append(error_message_data)
+else:
     st.write("안녕하세요 ☺️ 뮤지컬 관람 계획 중이신가요? \n\n왼쪽에서 채팅방을 선택하거나 새로 시작하세요.")
