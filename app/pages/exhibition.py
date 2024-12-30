@@ -1,5 +1,4 @@
 import base64
-import os
 import time
 from datetime import datetime
 
@@ -8,15 +7,6 @@ import streamlit as st
 from muse_chat.chat import MuseChatGraph, process_query
 from muse_chat.chat_modules.tool import Tool
 from shared.mongo_base import MongoBase
-
-
-@st.cache_resource
-def connect_db():
-    MongoBase.initialize(
-        os.getenv("MONGO_URI"),
-        os.getenv("MONGO_DB_NAME"),
-        os.getenv("MONGO_VECTOR_DB_NAME"),
-    )
 
 
 @st.cache_resource
@@ -263,15 +253,12 @@ def main():
         st.session_state.current_chat = new_chat()
 
     # 현재 쿼리 저장을 위한 변수
-    if (
-        "current_query" not in st.session_state
-        and st.session_state.current_chat["messages"]
-    ):
+    if st.session_state.current_chat["messages"]:
         st.session_state.current_query = st.session_state.current_chat["messages"][-1][
             "content"
         ]
     else:
-        st.session_state.current_query = None
+        st.session_state.current_query = " "
     update_sidebar(chat_history_db, st.session_state.current_query, rewrite_graph)
 
     # 채팅 메시지들을 표시
@@ -334,5 +321,5 @@ if __name__ == "__main__":
     st.title("💬 Muse Chat")
     st.caption("사용자 관심사 기반 전시회 추천 가이드")
 
-    connect_db()
+    # connect_db()
     main()

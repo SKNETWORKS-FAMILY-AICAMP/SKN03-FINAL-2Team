@@ -127,7 +127,6 @@ class Chain:
             RunnablePassthrough.assign(
                 query=lambda x: x["query"],
                 ranked_exhibitions=lambda x: x["ranked_exhibitions"],
-                scoring_info=lambda x: x["scoring_info"],
             )
             | prompt
             | model

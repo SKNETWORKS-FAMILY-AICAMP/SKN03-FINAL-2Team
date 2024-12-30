@@ -14,7 +14,7 @@ class Supervisor(Base):
 
 
 class CheckSimilarity(Base):
-    def __init__(self, threshold=0.9, **kwargs):
+    def __init__(self, threshold=0.65, **kwargs):
         super().__init__(**kwargs)
         self.name = "CheckSimilarity"
         self.threshold = threshold
@@ -22,7 +22,7 @@ class CheckSimilarity(Base):
     def process(self, state: GraphState) -> str:
         try:
             # 점수 정보에서 최대 점수 확인
-            max_score = state["scoring_info"].get("max_score", 0)
+            max_score = state["reranked_documents"][0].get("score", 0)
             print(
                 f"CheckSimilarity - Max Score: {max_score}, Threshold: {self.threshold}"
             )

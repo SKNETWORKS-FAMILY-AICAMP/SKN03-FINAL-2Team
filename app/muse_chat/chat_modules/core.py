@@ -136,13 +136,11 @@ class SimilarityRerankerNode(Base):
         if not state["aggregated_documents"]:
             return {"reranked_documents": []}
 
-        # 디서에서 텍스트 추출
+        # 텍스트 추출
         doc_texts = [doc["E_context"] for doc in state["aggregated_documents"]]
 
         # 재정렬 수행
-        reranked_results = self.model.rerank(
-            documents=doc_texts, query=state["hypothetical_doc"]
-        )
+        reranked_results = self.model.rerank(documents=doc_texts, query=state["query"])
 
         # 재정렬된 문서 생성
         reranked_documents = []
@@ -183,14 +181,6 @@ class PopularityRerankerNode(Base):
             # 최종 점수 계산 (유사도 70%, 인기도 30%)
             final_score = base_score * 0.7 + normalized_popularity * 0.3
 
-            # 디버깅을 위한 점수 정보 저장
-            doc["score_details"] = {
-                "base_score": base_score,
-                "popularity": popularity,
-                "normalized_popularity": normalized_popularity,
-                "final_score": final_score,
-            }
-
             return final_score
         except Exception as e:
             print(f"Error in calculate_score: {e}")
@@ -200,7 +190,7 @@ class PopularityRerankerNode(Base):
         try:
             # 각 문서에 대한 점수 계산
             docs_with_scores = []
-            for doc in state["aggregated_documents"]:
+            for doc in state["reranked_documents"]:
                 score = self.calculate_score(doc)
                 doc_with_score = doc.copy()
                 doc_with_score["final_score"] = score
@@ -271,8 +261,7 @@ class LowSimilarityGeneratorNode(Base):
             # LLM에 전달할 컨텍스트 준비
             context = {
                 "query": state["query"],
-                "ranked_exhibitions": state["popularity_ranked_documents"],
-                "scoring_info": state["scoring_info"],
+                "ranked_exhibitions": state["reranked_documents"],
             }
 
             # 응답 생성

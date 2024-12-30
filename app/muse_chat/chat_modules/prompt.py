@@ -126,13 +126,10 @@ User Query: {query}
 Ranked Exhibition Information:
 {ranked_exhibitions}
 
-Score Information:
-{scoring_info}
-
 Please generate an alternative recommendation response:"""
         return PromptTemplate(
             template=generator_template,
-            input_variables=["query", "ranked_exhibitions", "scoring_info"],
+            input_variables=["query", "ranked_exhibitions"],
         )
 
     @staticmethod
