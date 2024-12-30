@@ -100,6 +100,8 @@ def new_func(agent_input):
 
 # 인터파크 링크 
 def fetch_interpark_ticket_url(keyword):
+    print(f"[DEBUG] 검색 시작: {keyword}")  # 초기 키워드 로깅
+    
     chrome_options = Options()
     chrome_options.add_argument('--headless')
     chrome_options.add_argument('--no-sandbox')
@@ -112,30 +114,53 @@ def fetch_interpark_ticket_url(keyword):
         service = Service()
         driver = webdriver.Chrome(service=service, options=chrome_options)
         
-        base_url = f"https://tickets.interpark.com/contents/search?keyword={keyword}&start=0&rows=20"
+        # 특수문자 처리를 위한 키워드 정제
+        search_keyword = keyword.split('#')[0].strip()
+        search_keyword = search_keyword.replace('.', '')
+        print(f"[DEBUG] 정제된 검색어: {search_keyword}")  # 정제된 키워드 로깅
+        
+        base_url = f"https://tickets.interpark.com/contents/search?keyword={search_keyword}&start=0&rows=20"
+        print(f"[DEBUG] 검색 URL: {base_url}")  # 검색 URL 로깅
+        
         driver.get(base_url)
+        print(f"[DEBUG] 페이지 로딩 완료")
         
-        # 페이지 로딩을 위한 짧은 대기 추가
+        # 페이지 소스 확인
+        print(f"[DEBUG] 페이지 타이틀: {driver.title}")
+        
         time.sleep(2)
-        
         wait = WebDriverWait(driver, 10)
         
-        # CSS 선택자 변경 시도
-        element = wait.until(EC.presence_of_element_located((By.CSS_SELECTOR, "a[data-prd-no]")))
-        data_prd_no = element.get_attribute("data-prd-no")
-        
-        if data_prd_no:
-            final_url = f"https://tickets.interpark.com/goods/{data_prd_no}"
-            return final_url
+        try:
+            element = wait.until(EC.presence_of_element_located((By.CSS_SELECTOR, "a[data-prd-no]")))
+            data_prd_no = element.get_attribute("data-prd-no")
+            print(f"[DEBUG] 찾은 상품 번호: {data_prd_no}")  # 상품 번호 로깅
+            
+            if data_prd_no:
+                final_url = f"https://tickets.interpark.com/goods/{data_prd_no}"
+                print(f"[DEBUG] 최종 URL: {final_url}")  # 최종 URL 로깅
+                return final_url
+            else:
+                print("[DEBUG] 상품 번호를 찾을 수 없음")
+                return None
+                
+        except Exception as e:
+            print(f"[DEBUG] 요소 찾기 실패: {str(e)}")
+            # 현재 페이지의 HTML 구조 확인
+            print("[DEBUG] 현재 페이지 HTML:")
+            print(driver.page_source[:500])  # 처음 500자만 출력
+            return None
             
     except Exception as e:
-        print(f"Error in fetch_interpark_ticket_url: {e}")
+        print(f"[DEBUG] 전체 프로세스 실패: {str(e)}")
         return None
         
     finally:
         try:
             driver.quit()
+            print("[DEBUG] 브라우저 종료 완료")
         except:
+            print("[DEBUG] 브라우저 종료 실패")
             pass
 
 
@@ -205,7 +230,7 @@ if current_session:
                         with st.chat_message("assistant"):
                             message = "추천 조건에 맞는 뮤지컬 정보를 찾을 수 없습니다."
                     else:
-                        # 상영 중인 뮤지컬 타��틀 저장
+                        # 상영 중인 뮤지컬 틀 저장
                         active_titles = matched_recommendations['title'].tolist()
                         st.session_state.active_titles = active_titles
                         st.markdown("현재 상영 중인 추천 뮤지컬 목록:\n")
