@@ -1,8 +1,14 @@
 import os
 
 from dotenv import load_dotenv
-from ragas.testset.graph import KnowledgeGraph, Node
-from ragas.testset.transforms.extractors import NERExtractor
+from langchain.docstore.document import Document
+from langchain_openai import ChatOpenAI, OpenAIEmbeddings
+from ragas.embeddings import LangchainEmbeddingsWrapper
+from ragas.llms import LangchainLLMWrapper
+from ragas.testset import TestsetGenerator
+from ragas.testset.graph import KnowledgeGraph, Node, NodeType
+from ragas.testset.synthesizers import default_query_distribution
+from ragas.testset.transforms import apply_transforms, default_transforms
 
 from muse_chat.chat import MuseChatGraph
 from shared.mongo_base import MongoBase
@@ -21,26 +27,53 @@ def init_db():
     return MongoBase.db["Exhibition"]
 
 
-async def build_knowledge_graph():
-    """전시회 데이터로부터 지식 그래프 생성"""
+def build_knowledge_graph(llm, embedding_model):
+    """전시 데이터를 Sequence[Document] 형태로 변환"""
     collection = init_db()
-    documents = list(collection.find({}))
-
-    nodes = []
-    for doc in documents:
-        nodes.append(
-            Node(
-                properties={"page_content": doc["E_context"]},
-            ),
+    # 랜덤으로 100개의 문서 샘플링
+    mongo_documents = list(collection.aggregate([{"$sample": {"size": 100}}]))
+    kg = KnowledgeGraph()
+    # MongoDB 문서들을 Langchain Document 형태로 변환
+    documents = []
+    for doc in mongo_documents:
+        # 각 문서의 메타데이터와 내용을 포함하여 Document 객체 생성
+        document = Document(
+            page_content=doc["E_context"],
+            metadata={
+                "title": doc.get("E_title", ""),
+            },
         )
-    extractor = NERExtractor()
-    output = [extractor.extract(node) for node in nodes]
+        documents.append(document)
 
-    return print(output[0])
+    for doc in documents:
+        kg.nodes.append(
+            Node(
+                type=NodeType.DOCUMENT,
+                properties={
+                    "page_content": doc.page_content,
+                    "document_metadata": doc.metadata,
+                },
+            )
+        )
+
+    trans = default_transforms(
+        documents=documents, llm=llm, embedding_model=embedding_model
+    )
+    apply_transforms(kg, trans)
+
+    return kg
 
 
-def generate_testset(knowledge_graph):
-    pass
+def generate_testset(knowledge_graph, llm, embedding_model):
+    generator = TestsetGenerator(
+        llm=llm,
+        embedding_model=embedding_model,
+        knowledge_graph=knowledge_graph,
+    )
+
+    query_distribution = default_query_distribution(llm)
+    testset = generator.generate(testset_size=10, query_distribution=query_distribution)
+    return testset.to_pandas()
 
 
 def evaluate_rag_pipeline(testset):
@@ -53,13 +86,17 @@ def main():
     # DB 초기화
     init_db()
 
+    llm = LangchainLLMWrapper(ChatOpenAI(model="gpt-4o-mini"))
+    embedding_model = LangchainEmbeddingsWrapper(OpenAIEmbeddings())
+
     # 지식 그래프 생성
     print("Building Knowledge Graph...")
-    kg = build_knowledge_graph()
+    kg = build_knowledge_graph(llm, embedding_model)
     print(kg)
-    # # 테스트셋 생성
-    # print("Generating Testset...")
-    # testset = generate_testset(kg)
+    # 테스트셋 생성
+    print("Generating Testset...")
+    testset = generate_testset(kg, llm, embedding_model)
+    print(testset)
 
     # # 평가 수행
     # print("Evaluating RAG Pipeline...")
