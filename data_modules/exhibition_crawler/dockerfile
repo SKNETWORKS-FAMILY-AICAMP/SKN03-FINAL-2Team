@@ -1,0 +1,50 @@
+FROM python:3.12-slim
+
+# 시스템 의존성 설치
+RUN apt-get update && apt-get install -y \
+    # PIL, lxml 등 이미지/XML 처리 라이브러리에 필요
+    zlib1g-dev \
+    # PIL, OpenCV 이미지 처리에 필요
+    libjpeg-dev \
+    # PIL, OpenCV 이미지 처리에 필요
+    libpng-dev \
+    # Python 패키지 빌드에 필요한 기본 도구
+    build-essential \
+    # 네트워크 요청 도구
+    curl \
+    # apt 저장소 관리 도구
+    software-properties-common \
+    # pip git 저장소 접근용
+    git \
+    # OpenCV 그래픽 라이브러리
+    libgl1-mesa-glx \
+    # OpenCV 시스템 라이브러리
+    libglib2.0-0 \
+    # 파일 다운로드 도구
+    wget \
+    # 패키지 인증용
+    gnupg2 \
+    # 헤드리스 브라우저
+    chromium \
+    # Selenium WebDriver
+    chromium-driver \
+    # EasyOCR 비디오/이미지 처리
+    ffmpeg \
+    # OpenCV X11 공유 메모리 지원
+    libsm6 \
+    # OpenCV X11 확장 지원
+    libxext6 \
+    && rm -rf /var/lib/apt/lists/*
+
+# AWS 기본 리전 설정
+ENV AWS_DEFAULT_REGION=ap-northeast-2
+
+# 배치 작업에 필요한 파일만 복사
+COPY data_modules/ /data_modules/
+COPY requirements.txt /requirements.txt
+
+# Python 패키지 설치
+RUN pip install --no-cache-dir -r /requirements.txt
+
+# 배치 작업 실행을 위한 기본 명령어
+CMD ["python", "-m", "data_modules.exhibition_crawler.main"]
