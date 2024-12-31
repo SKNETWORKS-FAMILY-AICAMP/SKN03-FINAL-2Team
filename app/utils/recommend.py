@@ -142,7 +142,7 @@ class Recommender:
             final_recommendations = pd.concat([final_recommendations, matched_reference_data]).sort_values(by='predicted_score', ascending=False).head(10)
 
         # 10개만 반환하도록 처리
-        final_recommendations = final_recommendations.head(10)
+        final_recommendations = final_recommendations.head(10).iloc[::-1]
 
         # 결과 출력
         return final_recommendations[['poster', 'title', 'place', 'cast', 'genre', 'ticket_price']]
