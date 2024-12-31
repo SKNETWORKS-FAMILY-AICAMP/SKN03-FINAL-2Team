@@ -6,9 +6,7 @@ from langchain_openai import ChatOpenAI, OpenAIEmbeddings
 from ragas.embeddings import LangchainEmbeddingsWrapper
 from ragas.llms import LangchainLLMWrapper
 from ragas.testset import TestsetGenerator
-from ragas.testset.graph import KnowledgeGraph, Node, NodeType
-from ragas.testset.synthesizers import default_query_distribution
-from ragas.testset.transforms import apply_transforms, default_transforms
+from ragas.testset.persona import Persona
 
 from muse_chat.chat import MuseChatGraph
 from shared.mongo_base import MongoBase
@@ -27,53 +25,64 @@ def init_db():
     return MongoBase.db["Exhibition"]
 
 
-def build_knowledge_graph(llm, embedding_model):
+def generate_testset():
     """전시 데이터를 Sequence[Document] 형태로 변환"""
     collection = init_db()
     # 랜덤으로 100개의 문서 샘플링
     mongo_documents = list(collection.aggregate([{"$sample": {"size": 100}}]))
-    kg = KnowledgeGraph()
-    # MongoDB 문서들을 Langchain Document 형태로 변환
     documents = []
     for doc in mongo_documents:
-        # 각 문서의 메타데이터와 내용을 포함하여 Document 객체 생성
-        document = Document(
-            page_content=doc["E_context"],
+        # Langchain Document 생성
+        langchain_doc = Document(
+            page_content=doc.get("E_context", ""),
             metadata={
                 "title": doc.get("E_title", ""),
+                "place": doc.get("E_place", ""),
+                "date": doc.get("E_date", ""),
+                "popularity": doc.get("E_ticketcast", ""),
+                "link": doc.get("E_link", ""),
+                "poster": doc.get("E_poster", ""),
             },
         )
-        documents.append(document)
-
-    for doc in documents:
-        kg.nodes.append(
-            Node(
-                type=NodeType.DOCUMENT,
-                properties={
-                    "page_content": doc.page_content,
-                    "document_metadata": doc.metadata,
-                },
-            )
-        )
-
-    trans = default_transforms(
-        documents=documents, llm=llm, embedding_model=embedding_model
+        documents.append(langchain_doc)
+    """페르소나 생성"""
+    persona_casual_visitor = Persona(
+        name="일반 관람객",
+        role_description="미술에 대한 깊은 지식은 없지만, 여가 시간에 전시회를 방문하여 문화생활을 즐기고 싶어하는 관람객",
     )
-    apply_transforms(kg, trans)
+    persona_art_enthusiast = Persona(
+        name="예술 애호가",
+        role_description="미술관과 갤러리를 자주 방문하며, 특정 작가나 예술 사조에 대해 깊이 있는 정보를 찾는 관람객",
+    )
+    persona_professional = Persona(
+        name="전문가",
+        role_description="미술계 종사자로서 전시의 기획 의도, 작품의 예술사적 맥락, 작가의 작품 세계에 대한 전문적인 정보를 찾는 관람객",
+    )
 
-    return kg
+    personas = [persona_casual_visitor, persona_art_enthusiast, persona_professional]
 
-
-def generate_testset(knowledge_graph, llm, embedding_model):
+    # generator
+    generator_llm = LangchainLLMWrapper(ChatOpenAI(model="gpt-4o-mini"))
+    generator_embeddings = LangchainEmbeddingsWrapper(OpenAIEmbeddings())
     generator = TestsetGenerator(
-        llm=llm,
-        embedding_model=embedding_model,
-        knowledge_graph=knowledge_graph,
+        llm=generator_llm,
+        embedding_model=generator_embeddings,
+        persona_list=personas,
     )
+    dataset = generator.generate_with_langchain_docs(
+        documents,
+        testset_size=10,
+    )
+    df = dataset.to_pandas()
 
-    query_distribution = default_query_distribution(llm)
-    testset = generator.generate(testset_size=10, query_distribution=query_distribution)
-    return testset.to_pandas()
+    # CSV 파일로 저장
+    output_path = "testset_results.csv"
+    df.to_csv(
+        output_path, index=False, encoding="utf-8-sig"
+    )  # utf-8-sig를 사용하여 한글 깨짐 방지
+    print(f"테스트셋이 {output_path}에 저장되었습니다.")
+
+    return df
 
 
 def evaluate_rag_pipeline(testset):
@@ -86,17 +95,11 @@ def main():
     # DB 초기화
     init_db()
 
-    llm = LangchainLLMWrapper(ChatOpenAI(model="gpt-4o-mini"))
-    embedding_model = LangchainEmbeddingsWrapper(OpenAIEmbeddings())
-
-    # 지식 그래프 생성
-    print("Building Knowledge Graph...")
-    kg = build_knowledge_graph(llm, embedding_model)
-    print(kg)
     # 테스트셋 생성
     print("Generating Testset...")
-    testset = generate_testset(kg, llm, embedding_model)
-    print(testset)
+    testset = generate_testset()
+    print("테스트셋 미리보기:")
+    print(testset.head())
 
     # # 평가 수행
     # print("Evaluating RAG Pipeline...")
