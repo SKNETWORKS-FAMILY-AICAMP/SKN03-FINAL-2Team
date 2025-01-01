@@ -1,11 +1,13 @@
-import os
+import time
 
-from dotenv import load_dotenv
 from langgraph.graph import END, START, StateGraph
+
 from muse_chat.chat_modules.condition import CheckAnswer, CheckSimilarity, Supervisor
 from muse_chat.chat_modules.core import (
     EmbedderNode,
-    HumanNode,
+    HighSimilarityGeneratorNode,
+    JudgeNode,
+    LowSimilarityGeneratorNode,
     MongoAggregationNode,
     MongoRetrieverNode,
     Multi2HyDENode,
@@ -13,106 +15,140 @@ from muse_chat.chat_modules.core import (
     ReWriterNode,
     SimilarityRerankerNode,
     Single2HyDENode,
+    SupervisorNode,
 )
 from muse_chat.chat_modules.state import GraphState
 from shared.mongo_base import MongoBase
 
-load_dotenv()
 
+class MuseChatGraph:
 
-def build_graph() -> StateGraph:
-    """
-    LangGraph를 사용하여 노드들을 연결
-    """
-    MongoBase.initialize(
-        os.getenv("MONGO_URI"),
-        os.getenv("MONGO_DB_NAME"),
-        os.getenv("MONGO_VECTOR_DB_NAME"),
-    )
+    def __init__(self):
+        self.vdb_collection = MongoBase.vector_db["Exhibition"]
+        self.db_collection = MongoBase.db["Exhibition"]
+        self.sub_graph = self.build_sub_graph()
+        self.main_graph = self.build_main_graph()
+        self.rewrite_graph = self.build_rewrite_graph()
 
-    vdb_collection = MongoBase.vector_db["Exhibition"]
-    db_collection = MongoBase.db["Exhibition"]
+    def build_sub_graph(self) -> StateGraph:
+        sub_graph = StateGraph(GraphState)
+        sub_graph.add_node("embedder", EmbedderNode())
+        sub_graph.add_node(
+            "retriever",
+            MongoRetrieverNode(collection=self.vdb_collection),
+        )
+        sub_graph.add_node("similarity_reranker", SimilarityRerankerNode())
+        sub_graph.add_node("popularity_reranker", PopularityRerankerNode())
+        sub_graph.add_node(
+            "aggregation",
+            MongoAggregationNode(collection=self.db_collection),
+        )
+        sub_graph.add_node("high_similarity_generator", HighSimilarityGeneratorNode())
+        sub_graph.add_node("low_similarity_generator", LowSimilarityGeneratorNode())
 
-    graph = StateGraph(GraphState)
-    graph.add_node("single2hyde", Single2HyDENode())
-    graph.add_node("multi2hyde", Multi2HyDENode())
-    graph.add_node("embedder", EmbedderNode())
-    graph.add_node(
-        "retriever",
-        MongoRetrieverNode(collection=vdb_collection),
-    )
-    graph.add_node("similarity_reranker", SimilarityRerankerNode())
-    graph.add_node("popularity_reranker", PopularityRerankerNode())
-    graph.add_node(
-        "aggregation",
-        MongoAggregationNode(collection=db_collection),
-    )
-    # graph.add_node("re_writer", ReWriterNode())
-    # graph.add_node("human", HumanNode())
+        sub_graph.add_edge(START, "embedder")
+        sub_graph.add_edge("embedder", "retriever")
+        sub_graph.add_edge("retriever", "aggregation")
+        sub_graph.add_edge("aggregation", "similarity_reranker")
+        sub_graph.add_conditional_edges(
+            "similarity_reranker",
+            CheckSimilarity(),
+            {
+                "high_similarity": "popularity_reranker",
+                "low_similarity": "low_similarity_generator",
+            },
+        )
+        sub_graph.add_edge("popularity_reranker", "high_similarity_generator")
+        sub_graph.add_edge("high_similarity_generator", END)
+        sub_graph.add_edge("low_similarity_generator", END)
 
-    graph.add_conditional_edges(
-        START,
-        Supervisor(),
-        {
-            "single_modal_input": "single2hyde",
-            "multi_modal_input": "multi2hyde",
-        },
-    )
-    graph.add_edge("single2hyde", "embedder")
-    graph.add_edge("multi2hyde", "embedder")
-    graph.add_edge("embedder", "retriever")
-    graph.add_edge("retriever", "similarity_reranker")
-    graph.add_edge("similarity_reranker", "aggregation")
-    graph.add_conditional_edges(
-        "aggregation",
-        CheckSimilarity(),
-        {
-            "high_similarity": "popularity_reranker",
-            "low_similarity": END,
-        },
-    )
+        return sub_graph.compile()
 
-    graph.add_edge("popularity_reranker", END)
-    # graph.add_edge("popularity_reranker", "human")
+    def build_main_graph(self) -> StateGraph:
+        """
+        LangGraph를 사용하여 노드들을 연결
+        """
 
-    # graph.add_conditional_edges(
-    #     "human",
-    #     CheckAnswer(),
-    #     {
-    #         "accept": END,
-    #         "revise": "re_writer",
-    #     },
-    # )
-    # graph.add_edge("re_writer", "retriever")
+        main_graph = StateGraph(GraphState)
+        main_graph.add_node("single2hyde", Single2HyDENode())
+        main_graph.add_node("multi2hyde", Multi2HyDENode())
+        main_graph.add_node("sub_graph", self.sub_graph)
+        main_graph.add_node("judge", JudgeNode())
+        main_graph.add_node("supervisor", SupervisorNode())
 
-    # 그래프 컴파일
-    return graph.compile()
+        main_graph.add_edge(START, "judge")
+        main_graph.add_conditional_edges(
+            "judge",
+            CheckAnswer(),
+            {
+                "yes": END,
+                "no": "supervisor",
+            },
+        )
+        main_graph.add_conditional_edges(
+            "supervisor",
+            Supervisor(),
+            {
+                "single_modal_input": "single2hyde",
+                "multi_modal_input": "multi2hyde",
+            },
+        )
+        main_graph.add_edge("single2hyde", "sub_graph")
+        main_graph.add_edge("multi2hyde", "sub_graph")
+        main_graph.add_edge("sub_graph", END)
+
+        # 그래프 컴파일
+        return main_graph.compile()
+
+    def build_rewrite_graph(self) -> StateGraph:
+        rewrite_graph = StateGraph(GraphState)
+        rewrite_graph.add_node("re_writer", ReWriterNode())
+        rewrite_graph.add_node("sub_graph", self.sub_graph)
+
+        rewrite_graph.add_edge(START, "re_writer")
+        rewrite_graph.add_edge("re_writer", "sub_graph")
+        rewrite_graph.add_edge("sub_graph", END)
+        return rewrite_graph.compile()
 
 
 def process_query(
     graph: StateGraph,
     query: str,
-    images: list = None,
+    image: str = None,
     chat_history: list = None,
+    last_documents: list = None,
+    hypothetical_doc: str = None,
 ):
-    """
-    쿼리를 처리하고 응답을 반환
-    """
-
     initial_state = {
         "query": query,
-        "images": images or [],
+        "image": image or "",
         "chat_history": chat_history or [],
+        "documents": last_documents or [],
+        "hypothetical_doc": hypothetical_doc or "",
     }
 
-    # 일반 실행 모드 사용
-    try:
-        final_state = graph.invoke(initial_state)
+    # LangGraph의 메시지 스트리밍 모드 사용
+    for namespace, chunk in graph.stream(
+        initial_state, stream_mode="updates", subgraphs=True
+    ):
+        for node, value in chunk.items():
+            # aggregation 노드의 결과 캡처
+            if node == "aggregation":
+                if isinstance(value, dict) and "aggregated_documents" in value:
+                    yield {"aggregated_documents": value["aggregated_documents"]}
+                continue
 
-        if isinstance(final_state, dict) and "response" in final_state:
-            response = final_state["response"]
-            yield response
-        else:
-            yield "응답을 처리하는 중 오류가 발생했습니다."
-    except Exception as e:
-        yield "응답을 처리하는 중 오류가 발생했습니다."
+            # judge 노드의 응답 스트리밍
+            if node == "judge" and value["judge_answer"] != "No":
+                yield value["judge_answer"]
+                continue
+
+            # single2hyde 또는 multi2hyde 노드의 결과 캡처
+            if node in ["single2hyde", "multi2hyde"]:
+                if isinstance(value, dict) and "hypothetical_doc" in value:
+                    yield {"hypothetical_doc": value["hypothetical_doc"]}
+                continue
+
+            # generator 노드의 응답 스트리밍
+            if node in ["high_similarity_generator", "low_similarity_generator"]:
+                yield value["response"]

@@ -1,13 +1,15 @@
+import importlib.util
 import os
+import sys
 
 import boto3
 import streamlit as st
-from components.sidebar import add_custom_sidebar
+from dotenv import load_dotenv
 from PIL import Image
-import sys
-import os
-import importlib.util
+
 from shared.mongo_base import MongoBase
+
+load_dotenv()
 
 
 @st.cache_data  # 데이터를 caching 처리
@@ -19,6 +21,11 @@ def __set_api_key():
         "UPSTAGE_API_KEY",
         "COHERE_API_KEY",
         "OPENAI_API_KEY",
+        "LANGCHAIN_TRACING_V2",
+        "LANGCHAIN_ENDPOINT",
+        "LANGCHAIN_API_KEY",
+        "LANGCHAIN_PROJECT",
+        # "KAKAO_REST_API_KEY",
     ]:
         if not os.environ.get(i):
             ssm = boto3.client("ssm")
@@ -36,10 +43,10 @@ def connect_db():
         os.getenv("MONGO_VECTOR_DB_NAME"),
     )
 
+
 # 페이지 기본 설정
 st.set_page_config(layout="wide", initial_sidebar_state="expanded")
 
-add_custom_sidebar()
 
 st.markdown(
     """

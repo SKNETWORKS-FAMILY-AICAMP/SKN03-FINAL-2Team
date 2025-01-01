@@ -237,4 +237,5 @@ if st.button("추천받기", key="run_button"):
                 else:
                     st.warning("추천 결과가 없습니다.")
             except Exception as e:
-                st.error(f"추천 과정에서 오류가 발생했습니다: {str(e)}")
+                # st.error(f"추천 과정에서 오류가 발생했습니다: {str(e)}")
+                pass

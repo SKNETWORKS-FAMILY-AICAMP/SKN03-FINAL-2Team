@@ -11,7 +11,14 @@ RUN apt-get update && apt-get install -y \
     curl \
     software-properties-common \
     git \
+    # Chrome 및 ChromeDriver 관련 패키지 추가
+    chromium \
+    chromium-driver \
     && rm -rf /var/lib/apt/lists/*
+
+# Chrome 관련 환경변수 설정
+ENV CHROME_BIN=/usr/bin/chromium
+ENV CHROMEDRIVER_PATH=/usr/bin/chromedriver
 
 # config.py 먼저 복사
 COPY config.py /config.py

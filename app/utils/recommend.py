@@ -99,7 +99,7 @@ class Recommender:
         top_titles = top_titles.drop_duplicates(subset=['clean_title'])
 
         matched_recommendations = self.reference_data[self.reference_data['title'].isin(top_titles['clean_title'])]
-        matched_recommendations['clean_title'] = matched_recommendations['title'].str.replace(r'\[.*?\]', '', regex=True).str.strip()
+        matched_recommendations.loc[:, 'clean_title'] = matched_recommendations['title'].str.replace(r'\[.*?\]', '', regex=True).str.strip()
         matched_recommendations = matched_recommendations.drop_duplicates(subset=['clean_title'])
 
         # 최종 데이터 결합
@@ -193,7 +193,7 @@ class Recommender:
         # 5. 상위 5개 타이틀 반환
         top_recommendations = X.sort_values(by="predicted_score", ascending=False).head(7)
         top_titles = top_recommendations['title'].map({v: k for k, v in title_encoder.items()}).tolist()
-
+        print("[DEBUG] Top 7 Recommended Titles:", top_titles)
         return top_titles
 
 
