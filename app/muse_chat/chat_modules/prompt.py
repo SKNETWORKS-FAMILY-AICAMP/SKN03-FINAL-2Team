@@ -219,7 +219,7 @@ Final Response (Without analysis process, generate Korean response if relevant a
 The title should briefly summarize the essence of the prompt and be suitable for displaying in a sidebar as a history entry.
 Ensure the title is short, clear, and emphasizes the main idea of the prompt.
 Avoid using special characters like '**', '*' or Markdown-style formatting.
-Create a title that is relevant to the exhibition.
+Create a title that is relevant to the exhibition. All responses must be in Korean.
 
 Prompt: {element}
 
