@@ -9,16 +9,12 @@ class Model:
         return UpstageEmbeddings(model="embedding-query")
 
     @staticmethod
-    def get_openai_single_model():
-        return ChatOpenAI(model="gpt-4o-mini", temperature=0.1)
+    def get_openai_single_model(temperature=0.1):
+        return ChatOpenAI(model="gpt-4o-2024-11-20", temperature=temperature)
 
     @staticmethod
-    def get_openai_multi_model():
-        return ChatOpenAI(
-            model="gpt-4o-2024-11-20",
-            temperature=0.1,
-            model_kwargs={"image_to_output": True},
-        )
+    def get_openai_multi_model(temperature=0.1):
+        return ChatOpenAI(model="gpt-4o-2024-11-20", temperature=temperature)
 
     @staticmethod
     def get_rerank_model():
