@@ -8,28 +8,32 @@ class Supervisor(Base):
         self.name = "Supervisor"
 
     def process(self, state: GraphState) -> str:
-        if state["images"]:
+        if state["image"]:
             return "multi_modal_input"
         return "single_modal_input"
 
 
 class CheckSimilarity(Base):
-    def __init__(self, threshold=0.7, **kwargs):
+    def __init__(self, threshold=0.65, **kwargs):
         super().__init__(**kwargs)
         self.name = "CheckSimilarity"
         self.threshold = threshold
 
     def process(self, state: GraphState) -> str:
-        # reranked_documents의 점수 확인
-        scores = [doc.get("score", 0) for doc in state["reranked_documents"]]
-        max_score = max(scores) if scores else 0
+        try:
+            # 점수 정보에서 최대 점수 확인
+            max_score = state["reranked_documents"][0].get("score", 0)
+            print(
+                f"CheckSimilarity - Max Score: {max_score}, Threshold: {self.threshold}"
+            )
 
-        print(f"CheckSimilarity - Max Score: {max_score}, Threshold: {self.threshold}")
-
-        # 임계값을 넘는 문서가 있는지 확인
-        if max_score >= self.threshold:
-            return "high_similarity"
-        return "low_similarity"
+            # 임계값을 넘는지 확인
+            if max_score >= self.threshold:
+                return "high_similarity"
+            return "low_similarity"
+        except Exception as e:
+            print(f"Error in CheckSimilarity: {e}")
+            return "low_similarity"
 
 
 class CheckAnswer(Base):
@@ -38,4 +42,8 @@ class CheckAnswer(Base):
         self.name = "CheckAnswer"
 
     def process(self, state: GraphState) -> str:
-        return state.get("answer_type", "revise")
+        judge_answer = state["judge_answer"][-1].content
+        print(f"CheckAnswer - Judge Answer: {judge_answer}")
+        if judge_answer == "No":
+            return "no"
+        return "yes"

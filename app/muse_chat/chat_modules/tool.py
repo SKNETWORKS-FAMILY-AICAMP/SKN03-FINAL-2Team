@@ -1,5 +1,7 @@
 from typing import Dict, List
 
+from muse_chat.chat_modules.chain import Chain
+
 
 class Tool:
     @staticmethod
@@ -20,3 +22,12 @@ class Tool:
             if content.strip():  # 빈 메시지 제외
                 formatted.append(f"{role}: {content}")
         return "\n".join(formatted)
+
+    @staticmethod
+    def make_history_title(element):
+        chain = Chain.set_history_title_chain()
+        return chain.invoke(
+            {
+                "element": element,
+            },
+        )
